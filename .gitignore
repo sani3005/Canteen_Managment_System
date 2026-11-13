@@ -1,0 +1,16 @@
+# Environment credentials and secrets
+.env
+
+# Binary executables and libraries
+*.exe
+*.dll
+*.o
+*.obj
+
+# Embedded compiler toolkit
+tools/
+
+# Logs and temporary files
+*.log
+.DS_Store
+Thumbs.db
