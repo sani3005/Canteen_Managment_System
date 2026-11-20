@@ -17,4 +17,8 @@ typedef struct {
    Returns 1 if valid owner, 0 if unauthorized/forbidden */
 int auth_validate_owner(const HttpRequest *req, AuthContext *out_ctx);
 
+/* Extract and validate a student token.
+   Returns 1 if valid student, 0 if unauthorized/forbidden */
+int auth_validate_student(const HttpRequest *req, AuthContext *out_ctx);
+
 #endif /* AUTH_H */

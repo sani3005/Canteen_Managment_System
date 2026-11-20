@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int auth_validate_owner(const HttpRequest *req, AuthContext *out_ctx) {
+static int auth_validate_role(const HttpRequest *req, AuthContext *out_ctx, const char *required_role) {
     if (!req || !out_ctx) return 0;
     
     memset(out_ctx, 0, sizeof(AuthContext));
@@ -13,10 +13,10 @@ int auth_validate_owner(const HttpRequest *req, AuthContext *out_ctx) {
         return 0;
     }
     
-    char escaped_token[128];
+    char escaped_token[sizeof(req->auth_token) * 2];
     db_escape_string(escaped_token, req->auth_token, (unsigned long)strlen(req->auth_token));
     
-    /* Verify token and role == 'owner' in MySQL */
+    /* Verify token and role in MySQL */
     MYSQL_RES *res = db_query(
         "SELECT user_id, canteen_id, username, role FROM users "
         "WHERE token = '%s' AND (token_expires_at IS NULL OR token_expires_at > NOW()) LIMIT 1;",
@@ -34,8 +34,7 @@ int auth_validate_owner(const HttpRequest *req, AuthContext *out_ctx) {
     }
     
     const char *role = row[3] ? row[3] : "";
-    if (strcmp(role, "owner") != 0) {
-        /* Not an owner */
+    if (strcmp(role, required_role) != 0) {
         mysql_free_result(res);
         return 0;
     }
@@ -48,4 +47,12 @@ int auth_validate_owner(const HttpRequest *req, AuthContext *out_ctx) {
     
     mysql_free_result(res);
     return 1;
+}
+
+int auth_validate_owner(const HttpRequest *req, AuthContext *out_ctx) {
+    return auth_validate_role(req, out_ctx, "owner");
+}
+
+int auth_validate_student(const HttpRequest *req, AuthContext *out_ctx) {
+    return auth_validate_role(req, out_ctx, "student");
 }

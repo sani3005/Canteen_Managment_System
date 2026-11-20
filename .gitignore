@@ -6,6 +6,9 @@
 *.dll
 *.o
 *.obj
+*.lib
+*.exp
+*.pdb
 
 # Embedded compiler toolkit
 tools/

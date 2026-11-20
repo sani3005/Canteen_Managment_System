@@ -27,4 +27,8 @@ void handle_get_analytics_summary(HttpRequest *req, const AuthContext *ctx);
 void handle_get_analytics_rush_hours(HttpRequest *req, const AuthContext *ctx);
 void handle_get_analytics_top_dishes(HttpRequest *req, const AuthContext *ctx);
 
+/* Student ordering */
+void handle_get_user_menu(HttpRequest *req, const AuthContext *ctx);
+void handle_post_user_order(HttpRequest *req, const AuthContext *ctx);
+
 #endif /* HANDLERS_H */

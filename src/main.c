@@ -16,6 +16,35 @@ static void route_request(HttpRequest *req) {
         return;
     }
 
+    /* Student menu and ordering endpoints */
+    if (strncmp(req->path, "/api/user/", 10) == 0) {
+        AuthContext auth_ctx;
+        if (!auth_validate_student(req, &auth_ctx)) {
+            if (req->auth_token[0] == '\0') {
+                send_error(req->client_sock, 401, "Missing authorization token. Send the student token in the Authorization header");
+            } else {
+                send_error(req->client_sock, 403, "Forbidden: Invalid token or student role required");
+            }
+            return;
+        }
+        if (auth_ctx.canteen_id <= 0) {
+            send_error(req->client_sock, 403, "Student is not associated with a canteen");
+            return;
+        }
+
+        if (strcmp(req->path, "/api/user/menu") == 0 && strcmp(req->method, "GET") == 0) {
+            handle_get_user_menu(req, &auth_ctx);
+            return;
+        }
+        if (strcmp(req->path, "/api/user/orders") == 0 && strcmp(req->method, "POST") == 0) {
+            handle_post_user_order(req, &auth_ctx);
+            return;
+        }
+
+        send_error(req->client_sock, 404, "Endpoint not found");
+        return;
+    }
+
     /* 2. Owner Endpoints Guard */
     if (strncmp(req->path, "/api/owner/", 11) == 0) {
         AuthContext auth_ctx;
