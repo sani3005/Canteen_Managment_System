@@ -16,6 +16,15 @@ static void route_request(HttpRequest *req) {
         return;
     }
 
+    if (strcmp(req->path, "/api/user/register") == 0 && strcmp(req->method, "POST") == 0) {
+        handle_post_user_register(req);
+        return;
+    }
+    if (strcmp(req->path, "/api/user/login") == 0 && strcmp(req->method, "POST") == 0) {
+        handle_post_user_login(req);
+        return;
+    }
+
     /* Student menu and ordering endpoints */
     if (strncmp(req->path, "/api/user/", 10) == 0) {
         AuthContext auth_ctx;
@@ -38,6 +47,10 @@ static void route_request(HttpRequest *req) {
         }
         if (strcmp(req->path, "/api/user/orders") == 0 && strcmp(req->method, "POST") == 0) {
             handle_post_user_order(req, &auth_ctx);
+            return;
+        }
+        if (strcmp(req->path, "/api/user/orders") == 0 && strcmp(req->method, "GET") == 0) {
+            handle_get_user_order(req, &auth_ctx);
             return;
         }
 

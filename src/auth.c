@@ -14,7 +14,11 @@ static int auth_validate_role(const HttpRequest *req, AuthContext *out_ctx, cons
     }
     
     char escaped_token[sizeof(req->auth_token) * 2];
-    db_escape_string(escaped_token, req->auth_token, (unsigned long)strlen(req->auth_token));
+    escaped_token[0] = '\0';
+    if (db_escape_string(escaped_token, req->auth_token,
+                         (unsigned long)strlen(req->auth_token)) == 0) {
+        return 0;
+    }
     
     /* Verify token and role in MySQL */
     MYSQL_RES *res = db_query(
