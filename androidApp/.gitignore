@@ -1,0 +1,14 @@
+.gradle/
+.bootstrap-gradle/
+.bootstrap-gradle.zip
+build/
+app/build/
+local.properties
+.vscode/
+*.iml
+.kotlin/
+.idea/
+*.apk
+*.aab
+*.jks
+*.keystore
