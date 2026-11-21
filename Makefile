@@ -7,10 +7,10 @@ CC      = gcc
 CFLAGS  = -O2 -Wall -Wextra -Wno-unused-parameter -Iinclude -Icivetweb -DNO_SSL -DNO_CGI
 
 ifeq ($(OS),Windows_NT)
-  # Change this path if MySQL is installed somewhere else
-  MYSQL_DIR ?= C:/Program Files/MySQL/MySQL Server 8.0
+  # Override MYSQL_DIR when MySQL is installed in a different location.
+  MYSQL_DIR ?= C:/Program Files/MySQL/MySQL Server 9.4
   CFLAGS  += -I"$(MYSQL_DIR)/include"
-  LDFLAGS  = -L"$(MYSQL_DIR)/lib" -lmysql -lws2_32
+  LDFLAGS  = -L"$(MYSQL_DIR)/lib" -lmysql -lws2_32 -lbcrypt
   TARGET   = server.exe
 else
   # mysql_config comes with libmysqlclient-dev (Linux) or mysql-client (Mac, brew)

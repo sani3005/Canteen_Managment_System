@@ -5,7 +5,7 @@
 /* routes.c - the route table: which URL + method calls which handler.
  *
  * CivetWeb calls api_handler() for every URL starting with /api/.
- * It looks the request up in the table below, checks the owner token
+ * It looks the request up in the table below, checks the required bearer token
  * (if the route needs it), and then calls the matching handler.
  */
 #include "routes.h"
@@ -21,12 +21,18 @@ typedef struct {
     const char *method;
     const char *path;
     HandlerFn   handler;
-    int         needs_owner;   /* 1 = must send a valid owner token */
+    int         auth_role;   /* 0 = public, 1 = owner, 2 = student */
 } Route;
 
 static const Route routes[] = {
     /* public */
     { "GET",    "/api/health",                      handle_health,                    0 },
+    { "POST",   "/api/student/register",            handle_student_register,           0 },
+
+    /* Students */
+    { "GET",    "/api/student/menu",                handle_get_student_menu,           2 },
+    { "POST",   "/api/student/orders",              handle_post_student_order,         2 },
+    { "GET",    "/api/student/orders",              handle_get_student_orders,         2 },
 
     /* Module 1: canteen */
     { "GET",    "/api/owner/canteen",               handle_get_canteen,               1 },
@@ -79,17 +85,25 @@ int api_handler(struct mg_connection *conn, void *cbdata) {
     if (!path_exists) { send_error(conn, 404, "Endpoint not found"); return 1; }
     if (!match)       { send_error(conn, 405, "Method not allowed"); return 1; }
 
-    /* Check the owner token if this route needs one */
+    /* Check the required owner or student token */
     AuthContext auth;
     memset(&auth, 0, sizeof(auth));
-    if (match->needs_owner) {
-        AuthResult r = auth_check_owner(conn, &auth);
+    if (match->auth_role != 0) {
+        AuthResult r = match->auth_role == 1
+            ? auth_check_owner(conn, &auth)
+            : auth_check_student(conn, &auth);
+        if (r == AUTH_MISSING && match->auth_role == 2) {
+            send_error(conn, 401, "Missing token. Send header 'Authorization: Bearer <student-token>'");
+            return 1;
+        }
         if (r == AUTH_MISSING) {
             send_error(conn, 401, "Missing token. Send header 'Authorization: Bearer <token>'");
             return 1;
         }
         if (r == AUTH_FORBIDDEN) {
-            send_error(conn, 403, "Forbidden: invalid token or owner role required");
+            send_error(conn, 403, match->auth_role == 1
+                ? "Forbidden: invalid token or owner role required"
+                : "Forbidden: invalid student token");
             return 1;
         }
     }

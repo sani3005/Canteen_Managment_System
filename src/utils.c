@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <bcrypt.h>
+#endif
 
 #define MAX_BODY_SIZE (64 * 1024)
 
@@ -107,4 +111,17 @@ void generate_join_code(char *out, size_t out_size) {
     for (int i = 0; i < 4; i++) suffix[i] = letters[rand() % (int)(sizeof(letters) - 1)];
     suffix[4] = '\0';
     snprintf(out, out_size, "CANT-%s", suffix);
+}
+
+int generate_secure_random(void *out, size_t size) {
+#ifdef _WIN32
+    return BCryptGenRandom(NULL, (PUCHAR)out, (ULONG)size,
+                           BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0;
+#else
+    FILE *random = fopen("/dev/urandom", "rb");
+    if (!random) return 0;
+    size_t read_size = fread(out, 1, size, random);
+    int close_result = fclose(random);
+    return read_size == size && close_result == 0;
+#endif
 }

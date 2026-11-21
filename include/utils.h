@@ -6,9 +6,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <stddef.h>
 #include "civetweb.h"
 #include "cJSON.h"
+#include <stddef.h>
 
 /* Send any JSON text with the given HTTP status */
 void send_json(struct mg_connection *conn, int status, const char *json_text);
@@ -30,5 +30,8 @@ int get_query_param(struct mg_connection *conn, const char *name, char *out, siz
 
 /* Make a join code like CANT-7K2Q */
 void generate_join_code(char *out, size_t out_size);
+
+/* Fill a buffer with cryptographically secure random bytes. */
+int generate_secure_random(void *out, size_t size);
 
 #endif

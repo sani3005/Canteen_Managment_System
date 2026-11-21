@@ -1,5 +1,5 @@
 /*
- * Name    : Renuka Veer
+ * Name    : saniya Gaonkar
  * Roll No : 2639
  */
 /* order_handler.c - Module 3: live order queue */
@@ -37,10 +37,10 @@ static cJSON *get_order_items(int order_id) {
  * and pre-orders. Pre-orders are sorted by their scheduled time. */
 void handle_get_live_orders(struct mg_connection *conn, const AuthContext *auth, const char *body) {
     MYSQL_RES *res = db_query(
-        "SELECT o.order_id, o.student_id, COALESCE(u.username, 'Student'), "
+        "SELECT o.order_id, o.student_id, COALESCE(s.full_name, 'Student'), "
         "       o.order_type, o.is_preorder, o.scheduled_time, o.status, "
         "       o.total_amount, o.created_at "
-        "FROM orders o LEFT JOIN users u ON o.student_id = u.user_id "
+        "FROM orders o LEFT JOIN students s ON o.student_id = s.student_id "
         "WHERE o.canteen_id = %d AND o.status IN ('pending', 'preparing', 'ready') "
         "ORDER BY o.is_preorder ASC, "
         "         CASE WHEN o.is_preorder = 1 THEN o.scheduled_time ELSE o.created_at END ASC;",

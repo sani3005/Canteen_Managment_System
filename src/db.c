@@ -71,7 +71,7 @@ static int run_sql(MYSQL *c, const char *fmt, va_list args) {
     char sql[4096];
     vsnprintf(sql, sizeof(sql), fmt, args);
     if (mysql_query(c, sql) != 0) {
-        fprintf(stderr, "[DB] Query failed: %s\n  SQL: %s\n", mysql_error(c), sql);
+        fprintf(stderr, "[DB] Query failed: %s\n", mysql_error(c));
         return 0;
     }
     return 1;

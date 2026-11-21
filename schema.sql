@@ -27,6 +27,23 @@ CREATE TABLE IF NOT EXISTS users (
     FOREIGN KEY (canteen_id) REFERENCES canteens(canteen_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Student profiles and their canteen-scoped API tokens are separate
+-- from owner accounts in users.
+CREATE TABLE IF NOT EXISTS students (
+    student_id INT AUTO_INCREMENT PRIMARY KEY,
+    canteen_id INT NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NULL,
+    phone VARCHAR(30) NULL,
+    student_number VARCHAR(50) NULL,
+    access_token CHAR(64) NULL UNIQUE,
+    token_expires_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (canteen_id) REFERENCES canteens(canteen_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_student_email (canteen_id, email),
+    UNIQUE KEY uq_student_number (canteen_id, student_number)
+) ENGINE=InnoDB;
+
 -- 3. Menu Items
 CREATE TABLE IF NOT EXISTS menu_items (
     item_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -56,7 +73,7 @@ CREATE TABLE IF NOT EXISTS orders (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME NULL,
     FOREIGN KEY (canteen_id) REFERENCES canteens(canteen_id) ON DELETE CASCADE,
-    FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
     INDEX idx_queue (canteen_id, status, scheduled_time, created_at)
 ) ENGINE=InnoDB;
 
@@ -86,10 +103,11 @@ INSERT INTO users (user_id, username, password_hash, role, canteen_id, token, to
 VALUES (1, 'canteen_owner', 'hashed_pw_owner', 'owner', 1, 'owner_secret_token_123', '2030-01-01 00:00:00')
 ON DUPLICATE KEY UPDATE token=VALUES(token), canteen_id=VALUES(canteen_id);
 
--- Student User
-INSERT INTO users (user_id, username, password_hash, role, canteen_id, token)
-VALUES (2, 'student_robin', 'hashed_pw_student', 'student', 1, 'student_token_abc')
-ON DUPLICATE KEY UPDATE canteen_id=VALUES(canteen_id);
+-- Example student profile. The sample token is for local API testing only.
+INSERT INTO students (student_id, canteen_id, full_name, email, phone, student_number, access_token)
+VALUES (2, 1, 'Robin Student', 'robin@example.edu', NULL, 'STU-0002',
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+ON DUPLICATE KEY UPDATE canteen_id=VALUES(canteen_id), full_name=VALUES(full_name);
 
 -- Menu Items
 INSERT INTO menu_items (item_id, canteen_id, name, description, price, is_available, category)

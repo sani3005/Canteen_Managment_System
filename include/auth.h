@@ -10,6 +10,7 @@
 
 typedef struct {
     int  user_id;
+    int  student_id;
     int  canteen_id;
     char username[64];
 } AuthContext;
@@ -21,5 +22,6 @@ typedef enum {
 } AuthResult;
 
 AuthResult auth_check_owner(struct mg_connection *conn, AuthContext *out);
+AuthResult auth_check_student(struct mg_connection *conn, AuthContext *out);
 
 #endif
