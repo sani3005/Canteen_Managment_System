@@ -4,7 +4,7 @@
 #include <signal.h>
 
 #include "http.h"
-#include "db.h"
+//#include "db.h"
 #include "auth.h"
 #include "utils.h"
 #include "handlers.h"
