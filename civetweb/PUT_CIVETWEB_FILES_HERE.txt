@@ -1,0 +1,8 @@
+Download CivetWeb from https://github.com/civetweb/civetweb/releases
+(or "Code > Download ZIP"), then copy these into THIS folder:
+
+  include/civetweb.h        ->  civetweb/civetweb.h
+  src/civetweb.c            ->  civetweb/civetweb.c
+  src/*.inl                 ->  civetweb/   (all the .inl files, if your version has them)
+
+Then you can delete this text file.
