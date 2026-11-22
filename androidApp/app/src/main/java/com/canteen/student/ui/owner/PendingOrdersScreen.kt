@@ -74,7 +74,7 @@ fun PendingOrdersScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Live Canteen Dashboard",
+                            text = "Your orders",
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -202,7 +202,7 @@ fun PendingOrdersScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "New orders placed by students will appear here in real-time.",
+                            text = "New orders will appear here.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -270,12 +270,12 @@ fun OrderCard(
             ) {
                 Column {
                     Text(
-                        text = "Order #${order.id}",
+                        text = "Order ID: ${order.id}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Time: ${order.orderTime}",
+                        text = "Time: ${order.orderTime.substring(11)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -288,7 +288,7 @@ fun OrderCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = if (order.orderType == OrderType.PARCEL) "📦 Parcel" else "🍽️ Eat in Canteen",
+                        text = if (order.orderType == OrderType.PARCEL) "Parcel" else "Eat-in",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
@@ -339,6 +339,11 @@ fun OrderCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            Text(
+                text="Order Items: ",
+                style=MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold
+            )
             // Itemized list
             Column(
                 modifier = Modifier.fillMaxWidth(),

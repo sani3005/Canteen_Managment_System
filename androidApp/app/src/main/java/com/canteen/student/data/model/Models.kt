@@ -372,6 +372,21 @@ data class TopDishesData(
     @SerializedName("top_selling_dishes") val topSellingDishes: List<TopSellingItem> = emptyList()
 )
 
+data class PeakDay(
+    @SerializedName("day") val day: String = "",
+    @SerializedName("day_full") val dayFull: String = "",
+    @SerializedName("completed_orders") val completedOrders: Int = 0,
+    @SerializedName("revenue") val revenue: Double = 0.0
+)
+
+data class PeakDaysData(
+    @SerializedName("peak_days") val peakDays: List<PeakDay> = emptyList()
+)
+
+data class TopDishesByDayData(
+    @SerializedName("top_dishes_by_day") val topDishesByDay: Map<String, List<TopSellingItem>> = emptyMap()
+)
+
 data class AnalyticsSummary(
     val totalRevenue: Double = 0.0,
     val totalOrders: Int = 0,
@@ -381,5 +396,7 @@ data class AnalyticsSummary(
     val eatInCount: Int = 0,
     val topSellingItems: List<TopSellingItem> = emptyList(),
     val rushHours: List<RushHour> = emptyList(),
+    val peakDays: List<PeakDay> = emptyList(),
+    val topDishesByDay: Map<String, List<TopSellingItem>> = emptyMap(),
     val recentOrders: List<Order> = emptyList()
 )

@@ -133,4 +133,10 @@ interface CanteenApiService {
 
     @GET("owner/analytics/top-dishes")
     suspend fun getTopDishes(): Response<ApiResponse<TopDishesData>>
+
+    @GET("owner/analytics/peak-days")
+    suspend fun getPeakDays(): Response<ApiResponse<com.canteen.student.data.model.PeakDaysData>>
+
+    @GET("owner/analytics/top-dishes-by-day")
+    suspend fun getTopDishesByDay(): Response<ApiResponse<com.canteen.student.data.model.TopDishesByDayData>>
 }

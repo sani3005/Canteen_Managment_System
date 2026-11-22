@@ -206,6 +206,12 @@ class CanteenRepositoryImpl(
         val topResp = apiService.getTopDishes()
         val topData = handleApiResponse(topResp)
 
+        val peakDaysResp = apiService.getPeakDays()
+        val peakDaysData = handleApiResponse(peakDaysResp)
+
+        val topDishesByDayResp = apiService.getTopDishesByDay()
+        val topDishesByDayData = handleApiResponse(topDishesByDayResp)
+
         AnalyticsSummary(
             totalRevenue = summaryData.todayRevenue,
             totalOrders = summaryData.todayOrders,
@@ -215,6 +221,8 @@ class CanteenRepositoryImpl(
             eatInCount = summaryData.packagingBreakdown.dineInOrders,
             topSellingItems = topData.topSellingDishes,
             rushHours = rushData.peakRushHours,
+            peakDays = peakDaysData.peakDays,
+            topDishesByDay = topDishesByDayData.topDishesByDay,
             recentOrders = emptyList()
         )
     }

@@ -12,9 +12,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +31,9 @@ import com.canteen.student.ui.auth.AuthScreen
 import com.canteen.student.ui.auth.UserRole
 import com.canteen.student.ui.owner.CanteenOwnerMainScreen
 import com.canteen.student.ui.student.StudentViewModel
+import androidx.compose.material.icons.outlined.RestaurantMenu
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.Icon
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -141,12 +146,26 @@ fun StudentApp(
             }
         },
         bottomBar = {
+
             NavigationBar {
                 listOf("menu", "cart", "orders").forEach { tab ->
+
                     NavigationBarItem(
                         selected = page == tab,
                         onClick = { page = tab },
-                        icon = { Text(when (tab) { "menu" -> "🍽"; "cart" -> "🛒"; else -> "📋" }) },
+
+                        icon = {
+                            Icon(
+                                imageVector = when (tab) {
+                                    "menu" -> Icons.Outlined.RestaurantMenu
+                                    "cart" -> Icons.Outlined.ShoppingCart
+                                    "orders" -> Icons.AutoMirrored.Outlined.ReceiptLong
+                                    else -> Icons.Outlined.Home
+                                },
+                                contentDescription = tab
+                            )
+                        },
+
                         label = {
                             Text(
                                 if (tab == "cart" && uiState.cart.isNotEmpty())
@@ -158,6 +177,7 @@ fun StudentApp(
                     )
                 }
             }
+
         }
     ) { padding ->
         Column(
@@ -198,15 +218,10 @@ fun StudentApp(
             when (page) {
                 "menu" -> {
                     Text(
-                        "Today's Live Menu",
+                        "Today's Menu",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        "Synced directly with canteen backend",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp, top = 12.dp)
                     )
 
                     Spacer(Modifier.height(12.dp))
@@ -509,17 +524,10 @@ fun StudentApp(
 
                             HorizontalDivider()
 
-                            Text(
-                                "Total Amount: ₹$cartTotal",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-
                             Spacer(Modifier.height(4.dp))
 
                             Text(
-                                "Order Packaging Option",
+                                "Order type:",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -533,7 +541,7 @@ fun StudentApp(
                                         selected = service == "Parcel",
                                         onClick = { service = "Parcel" }
                                     )
-                                    Text("📦 Takeaway Parcel")
+                                    Text("Parcel")
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -541,9 +549,17 @@ fun StudentApp(
                                         selected = service == "Eat-in",
                                         onClick = { service = "Eat-in" }
                                     )
-                                    Text("🍽️ Eat in Canteen")
+                                    Text("Eat-in")
                                 }
                             }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Text(
+                                "Order Amount: ₹$cartTotal",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
 
                             Spacer(Modifier.height(12.dp))
 
@@ -561,7 +577,7 @@ fun StudentApp(
                                     )
                                 } else {
                                     Text(
-                                        "Place Order (₹$cartTotal)",
+                                        "Place Order",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -582,11 +598,6 @@ fun StudentApp(
                                 "My Orders",
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "Live order status & pickup verification OTP",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -625,7 +636,7 @@ fun StudentApp(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    "Place your first order from today's menu!",
+                                    "Place your first order from the menu!",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -651,7 +662,7 @@ fun StudentApp(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                "Order #${order.orderId}",
+                                                "Order ID: ${order.orderId}",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -663,7 +674,7 @@ fun StudentApp(
                                                 shape = RoundedCornerShape(6.dp)
                                             ) {
                                                 Text(
-                                                    text = if (order.orderType == "parcel") "📦 Parcel" else "🍽️ Dine-In",
+                                                    text = if (order.orderType == "parcel") "Parcel" else "Eat-In",
                                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                                     style = MaterialTheme.typography.labelMedium,
                                                     fontWeight = FontWeight.Bold
@@ -672,7 +683,7 @@ fun StudentApp(
                                         }
 
                                         Text(
-                                            "Placed at: ${order.createdAt}",
+                                            "Ordered on: ${order.createdAt}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -723,13 +734,13 @@ fun StudentApp(
 
                                         HorizontalDivider()
 
-                                        Text(
-                                            "Pickup Verification OTP",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-
                                         if (!order.pickupOtp.isNullOrEmpty()) {
+                                            Text(
+                                                "Pickup OTP",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold
+                                            )
+
                                             ElevatedCard(
                                                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                                                 modifier = Modifier.fillMaxWidth()
@@ -742,7 +753,7 @@ fun StudentApp(
                                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                                 ) {
                                                     Text(
-                                                        text = "🔑 Your Pickup OTP",
+                                                        text = "Your Pickup OTP",
                                                         style = MaterialTheme.typography.titleSmall,
                                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                                     )
@@ -758,35 +769,6 @@ fun StudentApp(
                                                         style = MaterialTheme.typography.bodySmall,
                                                         textAlign = TextAlign.Center,
                                                         color = MaterialTheme.colorScheme.onPrimaryContainer
-                                                    )
-                                                }
-                                            }
-                                        } else {
-                                            ElevatedCard(
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(12.dp),
-                                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "🔒 OTP Not Available Yet",
-                                                        style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.SemiBold
-                                                    )
-                                                    Text(
-                                                        text = if (order.status.lowercase() == "completed")
-                                                            "Order has been picked up & completed."
-                                                        else if (order.status.lowercase() == "cancelled")
-                                                            "Order was cancelled."
-                                                        else
-                                                            "Your 6-digit pickup OTP will appear here as soon as the canteen marks your order as 'Ready'.",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        textAlign = TextAlign.Center,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
                                             }

@@ -22,7 +22,8 @@ data class AnalyticsUiState(
     val summary: AnalyticsSummary = AnalyticsSummary(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val selectedTimeFilter: TimeFilter = TimeFilter.TODAY
+    val selectedTimeFilter: TimeFilter = TimeFilter.TODAY,
+    val selectedDayOfWeek: String = "Monday"
 )
 
 class AnalyticsViewModel(
@@ -62,5 +63,9 @@ class AnalyticsViewModel(
     fun setTimeFilter(filter: TimeFilter) {
         _uiState.update { it.copy(selectedTimeFilter = filter) }
         fetchAnalytics()
+    }
+
+    fun setSelectedDayOfWeek(day: String) {
+        _uiState.update { it.copy(selectedDayOfWeek = day) }
     }
 }
