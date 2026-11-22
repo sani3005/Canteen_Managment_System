@@ -461,7 +461,7 @@ fun StudentApp(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "🎉 Order Placed!",
+                                        text = "Order Placed!",
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -478,7 +478,7 @@ fun StudentApp(
                                             page = "orders"
                                         }
                                     ) {
-                                        Text("View Order Progress & OTP")
+                                        Text("View Order")
                                     }
                                 }
                             }
