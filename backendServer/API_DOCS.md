@@ -4,7 +4,8 @@ This document describes the HTTP API exposed by the Canteen Management System ba
 
 ## Base URL
 
-The backend listens on `http://localhost:8080` by default. The port can be changed with the `PORT` environment variable or the `PORT` setting in `.env`.
+The backend listens on `0.0.0.0:8080` by default, with `0.0.0.0` exposing it on all IPv4 network interfaces.
+The port can be changed with the `PORT` environment variable or the `PORT` setting in `.env`.
 
 ```text
 http://localhost:8080

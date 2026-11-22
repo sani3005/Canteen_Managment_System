@@ -65,7 +65,7 @@ interface CanteenApiService {
     @GET("owner/canteen")
     suspend fun getCanteenInfo(): Response<ApiResponse<CanteenInfo>>
 
-    @POST("owner/join-code/regenerate")
+    @POST("owner/canteen/join-code")
     suspend fun regenerateJoinCode(): Response<ApiResponse<JoinCodeData>>
 
 
@@ -74,17 +74,17 @@ interface CanteenApiService {
     @GET("owner/menu")
     suspend fun getOwnerMenu(): Response<ApiResponse<MenuDataResponse>>
 
-    @POST("owner/menu")
+    @POST("owner/menu/item")
     suspend fun createMenuItem(@Body request: CreateMenuItemRequest): Response<ApiResponse<ItemCreatedResponse>>
 
-    @PUT("owner/menu")
+    @PUT("owner/menu/item")
     suspend fun updateMenuItem(@Body request: UpdateMenuItemRequest): Response<ApiResponse<ItemUpdatedResponse>>
 
-    @PATCH("owner/menu/toggle-stock")
+    @PATCH("owner/menu/item/toggle-stock")
     suspend fun toggleStock(@Body request: ToggleStockRequest): Response<ApiResponse<ToggleStockResponse>>
 
-    @DELETE("owner/menu")
-    suspend fun deleteMenuItem(@Query("item_id") itemId: Int): Response<ApiResponse<ItemDeletedResponse>>
+    @DELETE("owner/menu/item")
+    suspend fun deleteMenuItem(@Query("id") itemId: Int): Response<ApiResponse<ItemDeletedResponse>>
 
 
     // --- OWNER ORDER ENDPOINTS ---

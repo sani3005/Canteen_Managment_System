@@ -1,6 +1,7 @@
 package com.canteen.student.ui.auth
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +50,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.clickable
+import com.canteen.student.data.api.SessionManager
+import com.canteen.student.data.repository.StudentRepositoryImpl
+import kotlinx.coroutines.launch
 
 enum class UserRole {
     STUDENT,
@@ -70,30 +75,69 @@ fun AuthScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
-    var joinCode by remember { mutableStateOf("") }
+    var joinCode by remember { mutableStateOf("CANT-9021") }
     var canteenName by remember { mutableStateOf("") }
 
+    var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    val scope = rememberCoroutineScope()
+    val studentRepo = remember { StudentRepositoryImpl() }
+
     fun handleAuthSubmit() {
-        if (email.isBlank() || password.isBlank()) {
-            errorMessage = "Please enter both email and password."
+        if (email.isBlank()) {
+            errorMessage = "Please enter an email address."
             return
         }
 
-        if (authMode == AuthMode.SIGN_UP) {
-            if (selectedRole == UserRole.STUDENT && fullName.isBlank()) {
-                errorMessage = "Please enter your full name."
-                return
-            }
-            if (selectedRole == UserRole.OWNER && canteenName.isBlank()) {
-                errorMessage = "Please enter your canteen name."
-                return
-            }
-        }
-
         errorMessage = null
-        onLoginSuccess(selectedRole)
+
+        if (selectedRole == UserRole.STUDENT) {
+            if (authMode == AuthMode.SIGN_UP) {
+                if (fullName.isBlank()) {
+                    errorMessage = "Please enter your full name."
+                    return
+                }
+                if (joinCode.isBlank()) {
+                    errorMessage = "Please enter a valid canteen join code."
+                    return
+                }
+
+                isLoading = true
+                scope.launch {
+                    studentRepo.registerStudent(
+                        fullName = fullName,
+                        email = email,
+                        joinCode = joinCode,
+                        phone = phone,
+                        studentNumber = null
+                    ).onSuccess { registerData ->
+                        isLoading = false
+                        SessionManager.setStudentSession(
+                            token = registerData.token,
+                            sId = registerData.studentId,
+                            cId = registerData.canteenId,
+                            name = fullName,
+                            email = email
+                        )
+                        onLoginSuccess(UserRole.STUDENT)
+                    }.onFailure { throwable ->
+                        isLoading = false
+                        errorMessage = throwable.localizedMessage ?: "Student registration failed"
+                    }
+                }
+            } else {
+                SessionManager.setStudentSession(
+                    token = SessionManager.DEFAULT_STUDENT_TOKEN,
+                    name = email,
+                    email = email
+                )
+                onLoginSuccess(UserRole.STUDENT)
+            }
+        } else {
+            SessionManager.setOwnerSession(SessionManager.DEFAULT_OWNER_TOKEN)
+            onLoginSuccess(UserRole.OWNER)
+        }
     }
 
     Surface(
@@ -221,7 +265,7 @@ fun AuthScreen(
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text(if (selectedRole == UserRole.STUDENT) "Email / Student ID" else "Owner Email") },
+                        label = { Text(if (selectedRole == UserRole.STUDENT) "Email Address" else "Owner Email") },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -247,22 +291,24 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = phone,
                             onValueChange = { phone = it },
-                            label = { Text("Phone Number") },
+                            label = { Text("Phone Number (Optional)") },
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = joinCode,
-                            onValueChange = { joinCode = it },
-                            label = { Text("Canteen Join Code (Optional)") },
-                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (selectedRole == UserRole.STUDENT) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = joinCode,
+                                onValueChange = { joinCode = it },
+                                label = { Text("Canteen Join Code (e.g. CANT-9021)") },
+                                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
 
                     // Error Message Banner
@@ -282,16 +328,27 @@ fun AuthScreen(
                     // Submit Button
                     Button(
                         onClick = { handleAuthSubmit() },
+                        enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text(
-                            text = if (authMode == AuthMode.LOGIN) "Log In" else "Sign Up",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .height(24.dp)
+                                    .width(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text(
+                                text = if (authMode == AuthMode.LOGIN) "Log In" else "Sign Up",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     // Switch Mode Toggle (Login <-> Sign Up)
@@ -314,9 +371,9 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Quick Demo Access Section
+            // Quick Access Section
             Text(
-                text = "⚡ Quick Demo Mode (Instant Access)",
+                text = "⚡ Quick Access Mode",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -329,24 +386,30 @@ fun AuthScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
-                    onClick = { onLoginSuccess(UserRole.STUDENT) },
+                    onClick = {
+                        SessionManager.setStudentSession(SessionManager.DEFAULT_STUDENT_TOKEN)
+                        onLoginSuccess(UserRole.STUDENT)
+                    },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "Demo Student",
+                        text = "Student Mode",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
 
                 OutlinedButton(
-                    onClick = { onLoginSuccess(UserRole.OWNER) },
+                    onClick = {
+                        SessionManager.setOwnerSession(SessionManager.DEFAULT_OWNER_TOKEN)
+                        onLoginSuccess(UserRole.OWNER)
+                    },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "Demo Owner",
+                        text = "Owner Mode",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )

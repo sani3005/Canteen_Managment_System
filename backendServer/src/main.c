@@ -66,12 +66,15 @@ int main(void)
     strcpy(cfg.user, "root");
     strcpy(cfg.database, "canteen_db");
     char http_port[16] = "8080";
+    char listening_ports[32];
 
     load_env_file(".env", &cfg, http_port, sizeof(http_port));
 
     const char *env_port = getenv("PORT");
     if (env_port && env_port[0] != '\0')
         snprintf(http_port, sizeof(http_port), "%s", env_port);
+
+    snprintf(listening_ports, sizeof(listening_ports), "0.0.0.0:%s", http_port);
 
     srand((unsigned int)time(NULL)); /* for join codes */
 
@@ -81,11 +84,11 @@ int main(void)
     }
 
     /* CivetWeb options.
-     * listening_ports : the port to listen on (from .env, default 8080).
+     * listening_ports : bind to all IPv4 interfaces on the configured port.
      * num_threads = 1 : requests are handled one at a time, so the single
      * MySQL connection is never used by two requests at once (keeps code simple). */
     const char *options[] = {
-        "listening_ports", http_port,
+        "listening_ports", listening_ports,
         "num_threads", "1",
         NULL};
 
@@ -96,7 +99,7 @@ int main(void)
     struct mg_context *server = mg_start(&callbacks, NULL, options);
     if (!server)
     {
-        fprintf(stderr, "[ERROR] Could not start server on port %s (is it already in use?)\n", http_port);
+        fprintf(stderr, "[ERROR] Could not start server on %s (is it already in use?)\n", listening_ports);
         db_close();
         return 1;
     }
@@ -105,8 +108,9 @@ int main(void)
     mg_set_request_handler(server, "/api/", api_handler, NULL);
 
     printf("====================================================\n");
-    printf("  Canteen Owner Backend running on http://localhost:%s\n", http_port);
-    printf("  Try: http://localhost:%s/api/health\n", http_port);
+    printf("  Canteen Owner Backend running on http://0.0.0.0:%s\n", http_port);
+    printf("  Try from this machine: http://localhost:%s/api/health\n", http_port);
+    printf("  Try from another device: http://<this-PC-IP-address>:%s/api/health\n", http_port);
     printf("  Press Enter to stop.\n");
     printf("====================================================\n");
     getchar(); /* the program waits here until you press Enter */

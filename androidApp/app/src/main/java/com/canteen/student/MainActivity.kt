@@ -1,7 +1,5 @@
 package com.canteen.student
 
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,48 +8,27 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.room.Room
-import com.canteen.student.data.CanteenDatabase
-import com.canteen.student.data.OrderEntity
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.canteen.student.data.model.MenuItem
 import com.canteen.student.ui.auth.AuthScreen
 import com.canteen.student.ui.auth.UserRole
 import com.canteen.student.ui.owner.CanteenOwnerMainScreen
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-
-// Demo-only local data. Replace with repository/backend data during integration.
-
-data class Food(
-    val id: Int,
-    val name: String,
-    val price: Int,
-    val category: String,
-    val available: Boolean = true
-)
-
-data class DemoOrder(val id: String, val summary: String, val total: Int, val mode: String, val service: String, val pickup: String, val status: String)
-
-val menu = listOf(
-    Food(1, "Veg Sandwich", 40, "Snacks"),
-    Food(2, "Masala Dosa", 55, "Meals"),
-    Food(3, "Samosa", 20, "Snacks"),
-    Food(4, "Veg Fried Rice", 75, "Meals"),
-    Food(5, "Tea", 15, "Beverages"),
-    Food(6, "Cold Coffee", 45, "Beverages")
-)
+import com.canteen.student.ui.student.StudentViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,96 +70,30 @@ fun MainAppHost() {
     }
 }
 
-@Composable
-fun PreOrderDateTimePicker(
-    selectedTime: String,
-    onTimeSelected: (String) -> Unit
-) {
-    val context = LocalContext.current
-
-    Button(
-        onClick = {
-            val now = Calendar.getInstance()
-
-            DatePickerDialog(
-                context,
-                { _, year, month, day ->
-                    TimePickerDialog(
-                        context,
-                        { _, hour, minute ->
-                            val selected = Calendar.getInstance().apply {
-                                set(year, month, day, hour, minute, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }
-
-                            if (selected.timeInMillis > System.currentTimeMillis()) {
-                                val formatter = SimpleDateFormat(
-                                    "dd MMM yyyy, hh:mm a",
-                                    Locale.getDefault()
-                                )
-                                onTimeSelected(formatter.format(selected.time))
-                            } else {
-                                onTimeSelected("")
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Please select a future date and time",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        },
-                        now.get(Calendar.HOUR_OF_DAY),
-                        now.get(Calendar.MINUTE),
-                        false
-                    ).show()
-                },
-                now.get(Calendar.YEAR),
-                now.get(Calendar.MONTH),
-                now.get(Calendar.DAY_OF_MONTH)
-            ).apply {
-                datePicker.minDate = System.currentTimeMillis() - 1000
-            }.show()
-        },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            if (selectedTime.isEmpty())
-                "Select Pickup Date & Time"
-            else
-                selectedTime
-        )
-    }
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentApp(
-    onSwitchRoleOrLogout: (() -> Unit)? = null
+    onSwitchRoleOrLogout: (() -> Unit)? = null,
+    viewModel: StudentViewModel = viewModel()
 ) {
-    val context = LocalContext.current.applicationContext
-
-    val database = remember {
-        Room.databaseBuilder(
-            context,
-            CanteenDatabase::class.java,
-            "canteen_database"
-        ).build()
-    }
-
-    val orderDao = remember(database) {
-        database.orderDao()
-    }
-
-    val orders by orderDao.getAllOrders().collectAsState(initial = emptyList())
-
-    val scope = rememberCoroutineScope()
-
-    val cart = remember { mutableStateMapOf<Int, Int>() }
+    val uiState by viewModel.uiState.collectAsState()
     var page by remember { mutableStateOf("menu") }
-    var selectedCategory by remember { mutableStateOf("All") }
-    var orderMode by remember { mutableStateOf("Order Now") }
     var service by remember { mutableStateOf("Parcel") }
-    var pickupTime by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    val total = menu.sumOf { it.price * (cart[it.id] ?: 0) }
+
+    val filteredMenu = uiState.menuItems.filter { item ->
+        val matchesCategory = uiState.selectedCategory == "All" || item.category.equals(uiState.selectedCategory, ignoreCase = true)
+        val matchesSearch = uiState.searchQuery.isBlank() ||
+                item.name.contains(uiState.searchQuery, ignoreCase = true) ||
+                item.description.contains(uiState.searchQuery, ignoreCase = true)
+        matchesCategory && matchesSearch
+    }
+
+    val cartItemDetails = uiState.cart.mapNotNull { (itemId, qty) ->
+        val item = uiState.menuItems.find { it.itemId == itemId }
+        if (item != null) item to qty else null
+    }
+
+    val cartTotal = cartItemDetails.sumOf { (item, qty) -> item.price * qty }
 
     Scaffold(
         topBar = {
@@ -190,20 +101,32 @@ fun StudentApp(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "Canteen Student • ${page.replaceFirstChar { it.uppercase() }}",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
-                    if (onSwitchRoleOrLogout != null) {
-                        IconButton(onClick = onSwitchRoleOrLogout) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = {
+                            viewModel.fetchMenu()
+                            viewModel.fetchOrders()
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Switch Role / Logout"
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Sync Backend Data"
                             )
+                        }
+                        if (onSwitchRoleOrLogout != null) {
+                            IconButton(onClick = onSwitchRoleOrLogout) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Switch Role / Logout"
+                                )
+                            }
                         }
                     }
                 }
@@ -216,39 +139,94 @@ fun StudentApp(
                         selected = page == tab,
                         onClick = { page = tab },
                         icon = { Text(when (tab) { "menu" -> "🍽"; "cart" -> "🛒"; else -> "📋" }) },
-                        label = { Text(tab.replaceFirstChar { it.uppercase() }) }
+                        label = {
+                            Text(
+                                if (tab == "cart" && uiState.cart.isNotEmpty())
+                                    "Cart (${uiState.cart.values.sum()})"
+                                else
+                                    tab.replaceFirstChar { it.uppercase() }
+                            )
+                        }
                     )
                 }
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            // Global Error Banner
+            uiState.errorMessage?.let { error ->
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { viewModel.dismissError() }) {
+                            Text("Dismiss")
+                        }
+                    }
+                }
+            }
+
             when (page) {
                 "menu" -> {
                     Text(
-                        "Today's Menu",
-                        style = MaterialTheme.typography.headlineSmall
+                        "Today's Live Menu",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        "Sample menu • will sync with owner backend later",
-                        style = MaterialTheme.typography.bodySmall
+                        "Synced directly with canteen backend",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(Modifier.height(12.dp))
 
-                    val categories = listOf("All", "Snacks", "Meals", "Beverages")
+                    // Search Field
+                    OutlinedTextField(
+                        value = uiState.searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        placeholder = { Text("Search dishes...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
 
+                    Spacer(Modifier.height(10.dp))
+
+                    // Category Filters
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        categories.forEach { category ->
+                        uiState.categories.forEach { category ->
                             FilterChip(
-                                selected = selectedCategory == category,
-                                onClick = { selectedCategory = category },
+                                selected = uiState.selectedCategory == category,
+                                onClick = { viewModel.setSelectedCategory(category) },
                                 label = { Text(category) }
                             )
                         }
@@ -256,80 +234,142 @@ fun StudentApp(
 
                     Spacer(Modifier.height(12.dp))
 
-                    val filteredMenu = if (selectedCategory == "All") {
-                        menu
-                    } else {
-                        menu.filter { it.category == selectedCategory }
-                    }
-
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(filteredMenu) { food ->
-                            ElevatedCard(
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
+                    if (uiState.isLoadingMenu && uiState.menuItems.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    } else if (filteredMenu.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.ShoppingCart,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        .height(64.dp)
+                                        .width(64.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "No menu items available",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(filteredMenu, key = { it.itemId }) { item ->
+                                ElevatedCard(
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Column(
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text(
-                                                food.name,
-                                                style = MaterialTheme.typography.titleMedium
-                                            )
-
-                                            Text(
-                                                "₹${food.price}",
-                                                style = MaterialTheme.typography.bodyLarge
-                                            )
-                                        }
-
-                                        Text(
-                                            text = if (food.available) "Available" else "Sold Out",
-                                            color = if (food.available)
-                                                MaterialTheme.colorScheme.primary
-                                            else
-                                                MaterialTheme.colorScheme.error,
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
-
-                                    if (food.available) {
-                                        val quantity = cart[food.id] ?: 0
-
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                            verticalAlignment = Alignment.Top
                                         ) {
-                                            Text(
-                                                "In Cart: $quantity",
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-
-                                            Button(
-                                                onClick = {
-                                                    cart[food.id] = quantity + 1
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        item.name,
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(Modifier.width(6.dp))
+                                                    Surface(
+                                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = item.category,
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                        )
+                                                    }
                                                 }
-                                            ) {
-                                                Text("Add +")
+
+                                                if (item.description.isNotBlank()) {
+                                                    Spacer(Modifier.height(4.dp))
+                                                    Text(
+                                                        item.description,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                Spacer(Modifier.height(4.dp))
+                                                Text(
+                                                    "₹${item.price}",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Bold
+                                                )
                                             }
+
+                                            Text(
+                                                text = if (item.isAvailable) "Available" else "Sold Out",
+                                                color = if (item.isAvailable)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
-                                    } else {
-                                        Text(
-                                            "Currently unavailable",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
+
+                                        if (item.isAvailable) {
+                                            val quantity = uiState.cart[item.itemId] ?: 0
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    "In Cart: $quantity",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+
+                                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    if (quantity > 0) {
+                                                        OutlinedButton(
+                                                            onClick = { viewModel.removeFromCart(item.itemId) }
+                                                        ) {
+                                                            Text("−")
+                                                        }
+                                                    }
+                                                    Button(
+                                                        onClick = { viewModel.addToCart(item.itemId) }
+                                                    ) {
+                                                        Text(if (quantity > 0) "+ Add More" else "Add +")
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Text(
+                                                "Currently unavailable from canteen counter",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -340,16 +380,54 @@ fun StudentApp(
                 "cart" -> {
                     Text(
                         "Your Cart",
-                        style = MaterialTheme.typography.headlineSmall
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
                     )
 
                     Spacer(Modifier.height(12.dp))
 
                     Column(
                         modifier = Modifier.verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (total == 0) {
+                        // Order Success Banner
+                        uiState.orderSuccessMessage?.let { successMsg ->
+                            ElevatedCard(
+                                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "🎉 Order Placed!",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = successMsg,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Button(
+                                        onClick = {
+                                            viewModel.dismissSuccessMessage()
+                                            page = "orders"
+                                        }
+                                    ) {
+                                        Text("View Order Progress & OTP")
+                                    }
+                                }
+                            }
+                        }
+
+                        if (cartItemDetails.isEmpty() && uiState.orderSuccessMessage == null) {
                             Text(
                                 text = "🛒",
                                 style = MaterialTheme.typography.displayLarge,
@@ -359,237 +437,197 @@ fun StudentApp(
 
                             Text(
                                 "Your cart is empty!",
-                                style = MaterialTheme.typography.titleLarge
+                                style = MaterialTheme.typography.titleLarge,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
                             )
 
                             Text(
-                                "Add some delicious food from today's menu.",
-                                style = MaterialTheme.typography.bodyMedium
+                                "Add delicious dishes from today's menu to place your order.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
                             )
 
                             Spacer(Modifier.height(12.dp))
 
                             Button(
-                                onClick = {
-                                    error = ""
-                                    page = "menu"
-                                },
+                                onClick = { page = "menu" },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("Browse Menu")
                             }
-                        } else {
-                            menu.filter { (cart[it.id] ?: 0) > 0 }.forEach { food ->
-                                ElevatedCard {
+                        } else if (cartItemDetails.isNotEmpty()) {
+                            cartItemDetails.forEach { (item, qty) ->
+                                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(12.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(Modifier.weight(1f)) {
-                                            Text(food.name)
-                                            Text("₹${food.price} × ${cart[food.id]}")
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                val n = (cart[food.id] ?: 0) - 1
-                                                if (n == 0) {
-                                                    cart.remove(food.id)
-                                                } else {
-                                                    cart[food.id] = n
-                                                }
-                                            }
-                                        ) {
-                                            Text("−")
-                                        }
-
-                                        Spacer(Modifier.width(4.dp))
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                cart[food.id] = (cart[food.id] ?: 0) + 1
-                                            }
-                                        ) {
-                                            Text("+")
-                                        }
-                                    }
-                                }
-                            }
-
-                            Text(
-                                "Total: ₹$total",
-                                style = MaterialTheme.typography.titleLarge
-                            )
-
-                            Text("When do you want your food?")
-
-                            Row {
-                                RadioButton(
-                                    selected = orderMode == "Order Now",
-                                    onClick = { orderMode = "Order Now" }
-                                )
-                                Text("Order Now", Modifier.padding(top = 12.dp))
-
-                                Spacer(Modifier.width(12.dp))
-
-                                RadioButton(
-                                    selected = orderMode == "Pre-Order",
-                                    onClick = { orderMode = "Pre-Order" }
-                                )
-                                Text("Pre-Order", Modifier.padding(top = 12.dp))
-                            }
-
-                            if (orderMode == "Pre-Order") {
-                                PreOrderDateTimePicker(
-                                    selectedTime = pickupTime,
-                                    onTimeSelected = { pickupTime = it }
-                                )
-
-                                Spacer(Modifier.height(8.dp))
-
-                                ElevatedCard(
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Text(
-                                            text = "💳 Pre-Order Payment",
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
-
-                                        HorizontalDivider()
-
-                                        Text(
-                                            text = "Order Amount: ₹$total",
-                                            style = MaterialTheme.typography.titleLarge
-                                        )
-
-                                        Text(
-                                            text = "Payment Status",
-                                            style = MaterialTheme.typography.titleSmall
-                                        )
-
-                                        Text(
-                                            text = "Payment integration pending",
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-
-                                        Text(
-                                            text = "Advance payment is required before a Pre-Order can be placed.",
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-
-                                        Button(
-                                            onClick = {},
-                                            enabled = false,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text("Pay Now - Coming Soon")
-                                        }
-                                    }
-                                }
-                            }
-
-                            Text("Order type")
-
-                            Row {
-                                RadioButton(
-                                    selected = service == "Parcel",
-                                    onClick = { service = "Parcel" }
-                                )
-                                Text("Parcel", Modifier.padding(top = 12.dp))
-
-                                Spacer(Modifier.width(12.dp))
-
-                                RadioButton(
-                                    selected = service == "Eat-in",
-                                    onClick = { service = "Eat-in" }
-                                )
-                                Text("Eat-in", Modifier.padding(top = 12.dp))
-                            }
-
-                            if (error.isNotBlank()) {
-                                Text(
-                                    error,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    if (total == 0) {
-                                        error = "Add at least one item"
-                                    } else {
-                                        val id = "DEMO-${System.currentTimeMillis()}"
-
-                                        val summary = menu
-                                            .filter { (cart[it.id] ?: 0) > 0 }
-                                            .joinToString {
-                                                "${it.name} × ${cart[it.id]}"
-                                            }
-
-                                        scope.launch {
-                                            orderDao.insertOrder(
-                                                OrderEntity(
-                                                    id = id,
-                                                    summary = summary,
-                                                    total = total,
-                                                    mode = orderMode,
-                                                    service = service,
-                                                    pickup = "Immediate",
-                                                    status = "DEMO • Not sent to canteen"
-                                                )
+                                            Text(
+                                                item.name,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                "₹${item.price} × $qty = ₹${item.price * qty}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
 
-                                        cart.clear()
-                                        error = ""
-                                        page = "orders"
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            OutlinedButton(
+                                                onClick = { viewModel.removeFromCart(item.itemId) }
+                                            ) {
+                                                Text("−")
+                                            }
+
+                                            Spacer(Modifier.width(6.dp))
+
+                                            OutlinedButton(
+                                                onClick = { viewModel.addToCart(item.itemId) }
+                                            ) {
+                                                Text("+")
+                                            }
+                                        }
                                     }
-                                },
-                                enabled = orderMode == "Order Now",
-                                modifier = Modifier.fillMaxWidth()
+                                }
+                            }
+
+                            HorizontalDivider()
+
+                            Text(
+                                "Total Amount: ₹$cartTotal",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            Spacer(Modifier.height(4.dp))
+
+                            Text(
+                                "Order Packaging Option",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                Text(
-                                    if (orderMode == "Pre-Order")
-                                        "Payment integration required"
-                                    else
-                                        "Place Demo Order"
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = service == "Parcel",
+                                        onClick = { service = "Parcel" }
+                                    )
+                                    Text("📦 Takeaway Parcel")
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = service == "Eat-in",
+                                        onClick = { service = "Eat-in" }
+                                    )
+                                    Text("🍽️ Eat in Canteen")
+                                }
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+
+                            Button(
+                                onClick = { viewModel.placeOrder(service) },
+                                enabled = !uiState.isPlacingOrder,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                            ) {
+                                if (uiState.isPlacingOrder) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Text(
+                                        "Place Order (₹$cartTotal)",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
                 "orders" -> {
-                    Text(
-                        "My Orders",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "My Orders",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Live order status & pickup verification OTP",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                    Text(
-                        "Your saved order history and tracking",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                        IconButton(onClick = { viewModel.fetchOrders() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh Orders")
+                        }
+                    }
 
                     Spacer(Modifier.height(12.dp))
 
-                    if (orders.isEmpty()) {
-                        Text("No orders yet. Please order food from the menu.")
+                    if (uiState.isLoadingOrders && uiState.orders.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    } else if (uiState.orders.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.ShoppingCart,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(64.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "No order history found",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "Place your first order from today's menu!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     } else {
                         LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            items(orders) { order ->
-                                var showDeleteDialog by remember { mutableStateOf(false) }
-
+                            items(uiState.orders, key = { it.orderId }) { order ->
                                 ElevatedCard(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -599,175 +637,151 @@ fun StudentApp(
                                             .padding(16.dp),
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "Order #${order.orderId}",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Surface(
+                                                color = if (order.orderType == "parcel")
+                                                    MaterialTheme.colorScheme.secondaryContainer
+                                                else
+                                                    MaterialTheme.colorScheme.tertiaryContainer,
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (order.orderType == "parcel") "📦 Parcel" else "🍽️ Dine-In",
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
                                         Text(
-                                            "Order ID: ${order.id}",
-                                            style = MaterialTheme.typography.titleMedium
+                                            "Placed at: ${order.createdAt}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
 
                                         HorizontalDivider()
 
                                         Text(
-                                            "Food Items",
-                                            style = MaterialTheme.typography.titleSmall
+                                            "Total Amount: ₹${order.totalAmount}",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
-
-                                        Text(order.summary)
-
-                                        Text(
-                                            "Total Amount: ₹${order.total}",
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
-
-                                        Text("Order Mode: ${order.mode}")
-                                        Text("Order Type: ${order.service}")
-                                        Text("Pickup Time: ${order.pickup}")
 
                                         HorizontalDivider()
 
                                         Text(
                                             "Order Status",
-                                            style = MaterialTheme.typography.titleSmall
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
                                         )
 
-                                        val statusColor = when (order.status) {
-                                            "Pending" -> MaterialTheme.colorScheme.tertiary
-                                            "Preparing" -> MaterialTheme.colorScheme.primary
-                                            "Ready for Pickup" -> MaterialTheme.colorScheme.secondary
-                                            "Completed" -> MaterialTheme.colorScheme.primary
+                                        val statusFormatted = order.status.replaceFirstChar { it.uppercase() }
+                                        val statusColor = when (order.status.lowercase()) {
+                                            "pending" -> MaterialTheme.colorScheme.tertiary
+                                            "preparing" -> MaterialTheme.colorScheme.primary
+                                            "ready" -> MaterialTheme.colorScheme.secondary
+                                            "completed" -> MaterialTheme.colorScheme.primary
+                                            "cancelled" -> MaterialTheme.colorScheme.error
                                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                                         }
 
                                         Text(
-                                            text = order.status,
+                                            text = statusFormatted,
                                             color = statusColor,
-                                            style = MaterialTheme.typography.titleMedium
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
                                         )
 
-                                        val trackingSteps = listOf(
-                                            "Pending",
-                                            "Preparing",
-                                            "Ready for Pickup",
-                                            "Completed"
-                                        )
-
-                                        val currentStep = trackingSteps.indexOf(order.status)
+                                        val trackingSteps = listOf("pending", "preparing", "ready", "completed")
+                                        val currentStep = trackingSteps.indexOf(order.status.lowercase())
 
                                         if (currentStep >= 0) {
-                                            Text(
-                                                "Order Progress",
-                                                style = MaterialTheme.typography.titleSmall
-                                            )
-
                                             LinearProgressIndicator(
-                                                progress = {
-                                                    (currentStep + 1).toFloat() / trackingSteps.size
-                                                },
+                                                progress = { (currentStep + 1).toFloat() / trackingSteps.size },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
-
-                                            trackingSteps.forEachIndexed { index, step ->
-                                                Text(
-                                                    text = if (index <= currentStep)
-                                                        "✓ $step"
-                                                    else
-                                                        "○ $step",
-                                                    color = if (index <= currentStep)
-                                                        MaterialTheme.colorScheme.primary
-                                                    else
-                                                        MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    style = MaterialTheme.typography.bodySmall
-                                                )
-                                            }
                                         }
 
                                         HorizontalDivider()
 
                                         Text(
-                                            "Pickup Verification",
-                                            style = MaterialTheme.typography.titleSmall
+                                            "Pickup Verification OTP",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
                                         )
 
-                                        ElevatedCard(
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(16.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        if (!order.pickupOtp.isNullOrEmpty()) {
+                                            ElevatedCard(
+                                                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                                modifier = Modifier.fillMaxWidth()
                                             ) {
-                                                Text(
-                                                    text = "🔒",
-                                                    style = MaterialTheme.typography.headlineLarge
-                                                )
-
-                                                Text(
-                                                    text = "OTP Not Available Yet",
-                                                    style = MaterialTheme.typography.titleMedium
-                                                )
-
-                                                Text(
-                                                    text = "Your pickup OTP will appear here when it is provided by the canteen system.",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(Modifier.height(8.dp))
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                showDeleteDialog = true
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                "Delete Order",
-                                                color = MaterialTheme.colorScheme.error
-                                            )
-                                        }
-
-                                        if (showDeleteDialog) {
-                                            AlertDialog(
-                                                onDismissRequest = {
-                                                    showDeleteDialog = false
-                                                },
-                                                title = {
-                                                    Text("Delete Order?")
-                                                },
-                                                text = {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(16.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
                                                     Text(
-                                                        "Are you sure you want to delete this order? This action cannot be undone."
+                                                        text = "🔑 Your Pickup OTP",
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer
                                                     )
-                                                },
-                                                confirmButton = {
-                                                    TextButton(
-                                                        onClick = {
-                                                            showDeleteDialog = false
-
-                                                            scope.launch {
-                                                                orderDao.deleteOrderById(order.id)
-                                                            }
-                                                        }
-                                                    ) {
-                                                        Text(
-                                                            "Delete",
-                                                            color = MaterialTheme.colorScheme.error
-                                                        )
-                                                    }
-                                                },
-                                                dismissButton = {
-                                                    TextButton(
-                                                        onClick = {
-                                                            showDeleteDialog = false
-                                                        }
-                                                    ) {
-                                                        Text("Cancel")
-                                                    }
+                                                    Text(
+                                                        text = order.pickupOtp,
+                                                        style = MaterialTheme.typography.headlineLarge,
+                                                        fontWeight = FontWeight.Bold,
+                                                        letterSpacing = 4.sp,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Text(
+                                                        text = "Show this 6-digit OTP code at the canteen counter to verify & collect your food.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        textAlign = TextAlign.Center,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    )
                                                 }
-                                            )
+                                            }
+                                        } else {
+                                            ElevatedCard(
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(12.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "🔒 OTP Not Available Yet",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Text(
+                                                        text = if (order.status.lowercase() == "completed")
+                                                            "Order has been picked up & completed."
+                                                        else if (order.status.lowercase() == "cancelled")
+                                                            "Order was cancelled."
+                                                        else
+                                                            "Your 6-digit pickup OTP will appear here as soon as the canteen marks your order as 'Ready'.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        textAlign = TextAlign.Center,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }

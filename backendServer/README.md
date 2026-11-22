@@ -24,7 +24,9 @@ make                                 # builds server (server.exe on Windows)
 For an existing database created using the previous schema, run
 `mysql -u root -p < migrate_students.sql` to create the separate student table and
 move the orders' student foreign key to it. Back up the database before migrating.
-Open http://localhost:8080/api/health to check it works. Press Enter in the console to stop.
+The server binds to `0.0.0.0:8080`, which makes it reachable on the machine's network interfaces.
+Open http://localhost:8080/api/health on this machine, or http://&lt;this-PC-IP-address&gt;:8080/api/health
+from another device on the same network. Press Enter in the console to stop.
 
 Linux needs: `sudo apt install build-essential libmysqlclient-dev`
 Windows: if MySQL is not in `C:/Program Files/MySQL/MySQL Server 9.4`, run

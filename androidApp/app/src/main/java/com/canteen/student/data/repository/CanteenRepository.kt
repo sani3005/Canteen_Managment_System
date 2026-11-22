@@ -62,19 +62,17 @@ class CanteenRepositoryImpl(
             if (!errorBodyString.isNull_or_Empty()) {
                 try {
                     val apiErr = gson.fromJson(errorBodyString, ApiResponse::class.java)
-                    if (!apiErr.message.isNullOrEmpty()) {
+                    if (!apiErr?.message.isNullOrEmpty()) {
                         throw Exception(apiErr.message)
                     }
                 } catch (e: Exception) {
-                    if (e !is Exception || e.message != errorBodyString) {
-                        // ignore parsing exception, throw raw string below
-                    } else {
+                    if (!e.message.isNullOrEmpty() && e.message != errorBodyString) {
                         throw e
                     }
                 }
-                throw Exception("HTTP ${response.code()}: $errorBodyString")
+                throw Exception(errorBodyString)
             }
-            throw Exception("HTTP error code: ${response.code()}")
+            throw Exception("Server returned HTTP error code ${response.code()}")
         }
     }
 
