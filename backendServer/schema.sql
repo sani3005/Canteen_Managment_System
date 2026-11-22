@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS orders (
     student_id INT NOT NULL,
     order_type ENUM('dine_in', 'parcel') NOT NULL DEFAULT 'dine_in',
     is_preorder TINYINT(1) NOT NULL DEFAULT 0,
-    scheduled_time DATETIME NULL,
+    scheduled_time VARCHAR(50) NULL,
     status ENUM('pending', 'preparing', 'ready', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
     otp_code VARCHAR(6) NOT NULL,
     total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,

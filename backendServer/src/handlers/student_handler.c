@@ -296,7 +296,11 @@ void handle_post_student_order(struct mg_connection *conn, const AuthContext *au
 
     cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
     cJSON *order_type_json = cJSON_GetObjectItemCaseSensitive(root, "order_type");
+    cJSON *is_preorder_json = cJSON_GetObjectItemCaseSensitive(root, "is_preorder");
+    cJSON *scheduled_time_json = cJSON_GetObjectItemCaseSensitive(root, "scheduled_time");
     const char *order_type = cJSON_IsString(order_type_json) ? order_type_json->valuestring : "dine_in";
+    int is_preorder = cJSON_IsBool(is_preorder_json) ? cJSON_IsTrue(is_preorder_json) : 0;
+    const char *scheduled_time = cJSON_IsString(scheduled_time_json) ? scheduled_time_json->valuestring : "";
     if (!cJSON_IsArray(items) || cJSON_GetArraySize(items) < 1 ||
         cJSON_GetArraySize(items) > MAX_ORDER_ITEMS ||
         (strcmp(order_type, "dine_in") != 0 && strcmp(order_type, "parcel") != 0)) {
@@ -304,6 +308,20 @@ void handle_post_student_order(struct mg_connection *conn, const AuthContext *au
         send_error(conn, 400, "Provide 1 to 50 items and order_type 'dine_in' or 'parcel'");
         return;
     }
+    if (cJSON_IsBool(is_preorder_json) && cJSON_IsTrue(is_preorder_json) &&
+        (scheduled_time[0] == '\0' || strlen(scheduled_time) > 50)) {
+        cJSON_Delete(root);
+        send_error(conn, 400, "A pre-order requires scheduled_time with at most 50 characters");
+        return;
+    }
+    if (!is_preorder) scheduled_time = "";
+    if (strlen(scheduled_time) > 50) {
+        cJSON_Delete(root);
+        send_error(conn, 400, "scheduled_time must contain at most 50 characters");
+        return;
+    }
+    char safe_scheduled_time[102];
+    db_escape(safe_scheduled_time, sizeof(safe_scheduled_time), scheduled_time);
 
     StudentOrderItem order_items[MAX_ORDER_ITEMS];
     int item_count = cJSON_GetArraySize(items);
@@ -379,9 +397,10 @@ void handle_post_student_order(struct mg_connection *conn, const AuthContext *au
         return;
     }
     int affected = db_execute(
-        "INSERT INTO orders (canteen_id, student_id, order_type, status, otp_code, total_amount) "
-        "VALUES (%d, %d, '%s', 'pending', '%s', %.2f);",
-        auth->canteen_id, auth->student_id, order_type, otp, (double)total_cents / 100.0);
+        "INSERT INTO orders (canteen_id, student_id, order_type, is_preorder, scheduled_time, status, otp_code, total_amount) "
+        "VALUES (%d, %d, '%s', %d, NULLIF('%s', ''), 'pending', '%s', %.2f);",
+        auth->canteen_id, auth->student_id, order_type, is_preorder,
+        safe_scheduled_time, otp, (double)total_cents / 100.0);
     unsigned long long order_id = affected > 0 ? db_last_insert_id() : 0;
     if (!order_id) {
         db_execute("ROLLBACK;");
@@ -414,14 +433,19 @@ void handle_post_student_order(struct mg_connection *conn, const AuthContext *au
     cJSON_AddStringToObject(data, "status", "pending");
     cJSON_AddStringToObject(data, "order_type", order_type);
     cJSON_AddNumberToObject(data, "total_amount", (double)total_cents / 100.0);
-    cJSON_AddStringToObject(data, "message", "The pickup OTP will appear when the order is ready");
+    cJSON_AddBoolToObject(data, "is_preorder", is_preorder == 1);
+    cJSON_AddStringToObject(data, "scheduled_time", is_preorder ? scheduled_time : "");
+    cJSON_AddStringToObject(data, "message",
+                            is_preorder ? "Pre-order placed successfully"
+                                        : "The pickup OTP will appear when the order is ready");
     send_success(conn, 201, "Order placed", data);
 }
 
 void handle_get_student_orders(struct mg_connection *conn, const AuthContext *auth, const char *body) {
     (void)body;
     MYSQL_RES *res = db_query(
-        "SELECT order_id, order_type, status, total_amount, created_at, otp_code "
+        "SELECT order_id, order_type, status, total_amount, created_at, otp_code, "
+        "       is_preorder, scheduled_time "
         "FROM orders WHERE student_id = %d AND canteen_id = %d "
         "ORDER BY created_at DESC;",
         auth->student_id, auth->canteen_id);
@@ -436,6 +460,8 @@ void handle_get_student_orders(struct mg_connection *conn, const AuthContext *au
         cJSON_AddStringToObject(order, "status", row[2] ? row[2] : "pending");
         cJSON_AddNumberToObject(order, "total_amount", row[3] ? atof(row[3]) : 0.0);
         cJSON_AddStringToObject(order, "created_at", row[4] ? row[4] : "");
+        cJSON_AddBoolToObject(order, "is_preorder", row[6] ? atoi(row[6]) == 1 : 0);
+        cJSON_AddStringToObject(order, "scheduled_time", row[7] ? row[7] : "");
         if (row[2] && strcmp(row[2], "ready") == 0) {
             cJSON_AddStringToObject(order, "pickup_otp", row[5] ? row[5] : "");
         }

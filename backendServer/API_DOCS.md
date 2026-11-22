@@ -212,6 +212,18 @@ Returns menu items belonging to the student's canteen, ordered by category and n
 ---
 
 ## `POST /api/student/orders`
+Supports immediate orders and pre-orders. Pre-orders require `is_preorder: true` and `scheduled_time`.
+
+```json
+{
+  "order_type": "parcel",
+  "is_preorder": true,
+  "scheduled_time": "01:30 PM",
+  "items": [
+    {"item_id": 1, "quantity": 2}
+  ]
+}
+```
 
 Creates an immediate dine-in or parcel order. The backend validates stock, calculates prices, and generates a pickup OTP.
 

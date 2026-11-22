@@ -1,6 +1,9 @@
 package com.canteen.student.data.model
 
 import com.google.gson.annotations.SerializedName
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * Standard API Response Envelope used by the backend.
@@ -54,7 +57,9 @@ data class OrderItemInput(
 
 data class PlaceOrderRequest(
     @SerializedName("order_type") val orderType: String = "dine_in",
-    @SerializedName("items") val items: List<OrderItemInput>
+    @SerializedName("items") val items: List<OrderItemInput>,
+    @SerializedName("is_preorder") val isPreorder: Boolean = false,
+    @SerializedName("scheduled_time") val scheduledTime: String? = null
 )
 
 data class PlaceOrderData(
@@ -62,6 +67,8 @@ data class PlaceOrderData(
     @SerializedName("status") val status: String,
     @SerializedName("order_type") val orderType: String,
     @SerializedName("total_amount") val totalAmount: Double,
+    @SerializedName("is_preorder") val isPreorder: Boolean = false,
+    @SerializedName("scheduled_time") val scheduledTime: String? = null,
     @SerializedName("message") val message: String? = null
 )
 
@@ -76,10 +83,49 @@ data class StudentOrderResponse(
     @SerializedName("status") val status: String,
     @SerializedName("total_amount") val totalAmount: Double,
     @SerializedName("created_at") val createdAt: String,
-    @SerializedName("pickup_otp") val pickupOtp: String? = null
+    @SerializedName("pickup_otp") val pickupOtp: String? = null,
+    @SerializedName("is_preorder") val isPreorder: Boolean = false,
+    @SerializedName("scheduled_time") val scheduledTime: String? = null
 )
 
 // --- OWNER CANTEEN DTOs ---
+
+object DateTimeUtils {
+    /**
+     * Formats a Calendar instance to MySQL DATETIME format: "YYYY-MM-DD HH:mm:ss"
+     */
+    fun formatForDb(calendar: Calendar): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        return sdf.format(calendar.time)
+    }
+
+    /**
+     * Converts a DB datetime string ("YYYY-MM-DD HH:mm:ss" or ISO) to user-friendly "10:45 PM"
+     */
+    fun formatForDisplay(dateTimeStr: String?): String {
+        if (dateTimeStr.isNullOrBlank()) return ""
+        return try {
+            val dbFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val date = dbFormat.parse(dateTimeStr)
+            if (date != null) {
+                val displayFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                displayFormat.format(date)
+            } else dateTimeStr
+        } catch (e: Exception) {
+            try {
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                val date = isoFormat.parse(dateTimeStr)
+                if (date != null) {
+                    val displayFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                    displayFormat.format(date)
+                } else dateTimeStr
+            } catch (e2: Exception) {
+                // If string is already formatted (e.g. legacy "10:45 PM"), return as-is
+                dateTimeStr
+            }
+        }
+    }
+}
 
 object CanteenCodeUtils {
     /**
@@ -292,7 +338,7 @@ data class Order(
 ) {
     val id: String get() = orderId.toString()
     val orderTime: String get() = created_At
-    val preOrderTime: String? get() = scheduledTime
+    val preOrderTime: String? get() = DateTimeUtils.formatForDisplay(scheduledTime)
 }
 
 data class LiveOrdersData(

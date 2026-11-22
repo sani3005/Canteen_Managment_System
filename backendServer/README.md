@@ -39,6 +39,12 @@ For an existing database created using the previous schema, run
 (or `mysql -u root -p < migrate_students.sql` in `cmd.exe`) to create the separate student table and
 move the orders' student foreign key to it. Back up the database before migrating.
 
+For databases that do not yet contain pre-order fields, also run:
+
+```powershell
+Get-Content -Raw .\migrate_preorders.sql | mysql -u root -p
+```
+
 For owner registration, also run the owner and canteen migrations when upgrading an older
 database:
 

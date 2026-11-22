@@ -2,6 +2,7 @@ package com.canteen.student.ui.student
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.canteen.student.data.model.DateTimeUtils
 import com.canteen.student.data.model.MenuItem
 import com.canteen.student.data.model.OrderItemInput
 import com.canteen.student.data.model.PlaceOrderData
@@ -24,6 +25,8 @@ data class StudentUiState(
     val isLoadingMenu: Boolean = false,
     val isLoadingOrders: Boolean = false,
     val isPlacingOrder: Boolean = false,
+    val isPreorder: Boolean = false,
+    val scheduledTime: String? = null,
     val errorMessage: String? = null,
     val orderSuccessMessage: String? = null,
     val placedOrderData: PlaceOrderData? = null
@@ -95,6 +98,14 @@ class StudentViewModel(
         _uiState.update { it.copy(searchQuery = query) }
     }
 
+    fun setIsPreorder(isPreorder: Boolean) {
+        _uiState.update { it.copy(isPreorder = isPreorder, scheduledTime = if (!isPreorder) null else it.scheduledTime) }
+    }
+
+    fun setScheduledTime(scheduledTime: String?) {
+        _uiState.update { it.copy(scheduledTime = scheduledTime) }
+    }
+
     fun addToCart(itemId: Int) {
         _uiState.update { state ->
             val currentQty = state.cart[itemId] ?: 0
@@ -130,9 +141,15 @@ class StudentViewModel(
     }
 
     fun placeOrder(orderType: String) {
-        val currentCart = _uiState.value.cart
+        val currentState = _uiState.value
+        val currentCart = currentState.cart
         if (currentCart.isEmpty()) {
             _uiState.update { it.copy(errorMessage = "Your cart is empty. Please add items to place an order.") }
+            return
+        }
+
+        if (currentState.isPreorder && currentState.scheduledTime.isNullOrBlank()) {
+            _uiState.update { it.copy(errorMessage = "Please select a pickup time for your pre-order.") }
             return
         }
 
@@ -144,14 +161,27 @@ class StudentViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isPlacingOrder = true, errorMessage = null, orderSuccessMessage = null) }
-            repository.placeOrder(apiOrderType, orderItems)
+            repository.placeOrder(
+                orderType = apiOrderType,
+                items = orderItems,
+                isPreorder = currentState.isPreorder,
+                scheduledTime = if (currentState.isPreorder) currentState.scheduledTime else null
+            )
                 .onSuccess { placeOrderData ->
+                    val rawTime = placeOrderData.scheduledTime ?: currentState.scheduledTime
+                    val displayTime = DateTimeUtils.formatForDisplay(rawTime)
+                    val preOrderInfoStr = if (placeOrderData.isPreorder || currentState.isPreorder) {
+                        if (displayTime.isNotBlank()) " (Pre-order for $displayTime)" else " (Pre-order)"
+                    } else ""
+
                     _uiState.update {
                         it.copy(
                             cart = emptyMap(),
                             isPlacingOrder = false,
                             placedOrderData = placeOrderData,
-                            orderSuccessMessage = "Order #${placeOrderData.orderId} placed successfully! Total: ₹${placeOrderData.totalAmount}"
+                            isPreorder = false,
+                            scheduledTime = null,
+                            orderSuccessMessage = "Order #${placeOrderData.orderId}$preOrderInfoStr placed successfully! Total: ₹${placeOrderData.totalAmount}"
                         )
                     }
                     fetchOrders()

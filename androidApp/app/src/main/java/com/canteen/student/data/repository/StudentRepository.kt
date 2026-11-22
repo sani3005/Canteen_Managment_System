@@ -29,7 +29,12 @@ interface StudentRepository {
     suspend fun loginStudent(email: String, password: String): Result<StudentLoginData>
 
     suspend fun getMenu(): Result<List<MenuItem>>
-    suspend fun placeOrder(orderType: String, items: List<OrderItemInput>): Result<PlaceOrderData>
+    suspend fun placeOrder(
+        orderType: String,
+        items: List<OrderItemInput>,
+        isPreorder: Boolean = false,
+        scheduledTime: String? = null
+    ): Result<PlaceOrderData>
     suspend fun getOrders(): Result<List<StudentOrderResponse>>
 }
 
@@ -110,9 +115,16 @@ class StudentRepositoryImpl(
 
     override suspend fun placeOrder(
         orderType: String,
-        items: List<OrderItemInput>
+        items: List<OrderItemInput>,
+        isPreorder: Boolean,
+        scheduledTime: String?
     ): Result<PlaceOrderData> = runCatching {
-        val req = PlaceOrderRequest(orderType = orderType, items = items)
+        val req = PlaceOrderRequest(
+            orderType = orderType,
+            items = items,
+            isPreorder = isPreorder,
+            scheduledTime = scheduledTime
+        )
         val response = apiService.placeStudentOrder(req)
         handleApiResponse(response)
     }
