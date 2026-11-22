@@ -1,1 +1,0 @@
-delete this file and place your android project code in here.

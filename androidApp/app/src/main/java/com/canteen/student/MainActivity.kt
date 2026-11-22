@@ -2,35 +2,35 @@ package com.canteen.student
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
-import androidx.compose.ui.platform.LocalContext
-import java.util.Calendar
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-
-import androidx.room.Room
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.room.Room
 import com.canteen.student.data.CanteenDatabase
 import com.canteen.student.data.OrderEntity
+import com.canteen.student.ui.auth.AuthScreen
+import com.canteen.student.ui.auth.UserRole
+import com.canteen.student.ui.owner.CanteenOwnerMainScreen
 import kotlinx.coroutines.launch
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.Alignment
-import androidx.compose.foundation.horizontalScroll
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 // Demo-only local data. Replace with repository/backend data during integration.
 
@@ -56,7 +56,40 @@ val menu = listOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { StudentApp() } }
+        setContent {
+            MaterialTheme {
+                MainAppHost()
+            }
+        }
+    }
+}
+
+@Composable
+fun MainAppHost() {
+    var currentUserRole by remember { mutableStateOf<UserRole?>(null) }
+
+    when (currentUserRole) {
+        null -> {
+            AuthScreen(
+                onLoginSuccess = { role ->
+                    currentUserRole = role
+                }
+            )
+        }
+        UserRole.STUDENT -> {
+            StudentApp(
+                onSwitchRoleOrLogout = {
+                    currentUserRole = null
+                }
+            )
+        }
+        UserRole.OWNER -> {
+            CanteenOwnerMainScreen(
+                onSwitchRoleOrLogout = {
+                    currentUserRole = null
+                }
+            )
+        }
     }
 }
 
@@ -82,18 +115,12 @@ fun PreOrderDateTimePicker(
                                 set(Calendar.MILLISECOND, 0)
                             }
 
-                            if (selected.timeInMillis >
-                                System.currentTimeMillis()
-                            ) {
-                                val formatter =
-                                    SimpleDateFormat(
-                                        "dd MMM yyyy, hh:mm a",
-                                        Locale.getDefault()
-                                    )
-
-                                onTimeSelected(
-                                    formatter.format(selected.time)
+                            if (selected.timeInMillis > System.currentTimeMillis()) {
+                                val formatter = SimpleDateFormat(
+                                    "dd MMM yyyy, hh:mm a",
+                                    Locale.getDefault()
                                 )
+                                onTimeSelected(formatter.format(selected.time))
                             } else {
                                 onTimeSelected("")
                                 android.widget.Toast.makeText(
@@ -112,8 +139,7 @@ fun PreOrderDateTimePicker(
                 now.get(Calendar.MONTH),
                 now.get(Calendar.DAY_OF_MONTH)
             ).apply {
-                datePicker.minDate =
-                    System.currentTimeMillis() - 1000
+                datePicker.minDate = System.currentTimeMillis() - 1000
             }.show()
         },
         modifier = Modifier.fillMaxWidth()
@@ -128,7 +154,9 @@ fun PreOrderDateTimePicker(
 }
 
 @Composable
-fun StudentApp() {
+fun StudentApp(
+    onSwitchRoleOrLogout: (() -> Unit)? = null
+) {
     val context = LocalContext.current.applicationContext
 
     val database = remember {
@@ -143,14 +171,11 @@ fun StudentApp() {
         database.orderDao()
     }
 
-    val orders by orderDao.getAllOrders()
-        .collectAsState(initial = emptyList())
+    val orders by orderDao.getAllOrders().collectAsState(initial = emptyList())
 
     val scope = rememberCoroutineScope()
 
-    val cart = remember {
-        mutableStateMapOf<Int, Int>()
-    }
+    val cart = remember { mutableStateMapOf<Int, Int>() }
     var page by remember { mutableStateOf("menu") }
     var selectedCategory by remember { mutableStateOf("All") }
     var orderMode by remember { mutableStateOf("Order Now") }
@@ -158,18 +183,48 @@ fun StudentApp() {
     var pickupTime by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     val total = menu.sumOf { it.price * (cart[it.id] ?: 0) }
-    Scaffold(topBar = { Surface(shadowElevation = 3.dp) { Text("Canteen Student • ${page.replaceFirstChar { it.uppercase() }}", modifier = Modifier.fillMaxWidth().padding(18.dp), style = MaterialTheme.typography.titleLarge) } }, bottomBar = {
-        NavigationBar {
-            listOf("menu", "cart", "orders").forEach { tab ->
-                NavigationBarItem(selected = page == tab, onClick = { page = tab }, icon = { Text(when(tab){"menu"->"🍽";"cart"->"🛒";else->"📋"}) }, label = { Text(tab.replaceFirstChar { it.uppercase() }) })
+
+    Scaffold(
+        topBar = {
+            Surface(shadowElevation = 3.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Canteen Student • ${page.replaceFirstChar { it.uppercase() }}",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    if (onSwitchRoleOrLogout != null) {
+                        IconButton(onClick = onSwitchRoleOrLogout) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Switch Role / Logout"
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            NavigationBar {
+                listOf("menu", "cart", "orders").forEach { tab ->
+                    NavigationBarItem(
+                        selected = page == tab,
+                        onClick = { page = tab },
+                        icon = { Text(when (tab) { "menu" -> "🍽"; "cart" -> "🛒"; else -> "📋" }) },
+                        label = { Text(tab.replaceFirstChar { it.uppercase() }) }
+                    )
+                }
             }
         }
-    }) { padding ->
+    ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            when(page) {
-               
+            when (page) {
                 "menu" -> {
-
                     Text(
                         "Today's Menu",
                         style = MaterialTheme.typography.headlineSmall
@@ -180,16 +235,9 @@ fun StudentApp() {
                         style = MaterialTheme.typography.bodySmall
                     )
 
-                                    
                     Spacer(Modifier.height(12.dp))
 
-                    // Food Category Buttons
-                    val categories = listOf(
-                        "All",
-                        "Snacks",
-                        "Meals",
-                        "Beverages"
-                    )
+                    val categories = listOf("All", "Snacks", "Meals", "Beverages")
 
                     Row(
                         modifier = Modifier
@@ -198,54 +246,42 @@ fun StudentApp() {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         categories.forEach { category ->
-
                             FilterChip(
                                 selected = selectedCategory == category,
-                                onClick = {
-                                    selectedCategory = category
-                                },
-                                label = {
-                                    Text(category)
-                                }
+                                onClick = { selectedCategory = category },
+                                label = { Text(category) }
                             )
                         }
                     }
 
                     Spacer(Modifier.height(12.dp))
 
-                    // Filter menu based on selected category
                     val filteredMenu = if (selectedCategory == "All") {
                         menu
                     } else {
                         menu.filter { it.category == selectedCategory }
                     }
 
-                    // Display filtered food items
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(filteredMenu) { food ->
-
                             ElevatedCard(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(14.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-
                                         Column(
                                             modifier = Modifier.weight(1f)
                                         ) {
-
                                             Text(
                                                 food.name,
                                                 style = MaterialTheme.typography.titleMedium
@@ -258,10 +294,7 @@ fun StudentApp() {
                                         }
 
                                         Text(
-                                            text = if (food.available)
-                                                "Available"
-                                            else
-                                                "Sold Out",
+                                            text = if (food.available) "Available" else "Sold Out",
                                             color = if (food.available)
                                                 MaterialTheme.colorScheme.primary
                                             else
@@ -271,7 +304,6 @@ fun StudentApp() {
                                     }
 
                                     if (food.available) {
-
                                         val quantity = cart[food.id] ?: 0
 
                                         Row(
@@ -279,7 +311,6 @@ fun StudentApp() {
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-
                                             Text(
                                                 "In Cart: $quantity",
                                                 style = MaterialTheme.typography.bodyMedium
@@ -293,9 +324,7 @@ fun StudentApp() {
                                                 Text("Add +")
                                             }
                                         }
-
                                     } else {
-
                                         Text(
                                             "Currently unavailable",
                                             style = MaterialTheme.typography.bodySmall,
@@ -308,7 +337,6 @@ fun StudentApp() {
                     }
                 }
 
-               
                 "cart" -> {
                     Text(
                         "Your Cart",
@@ -321,15 +349,13 @@ fun StudentApp() {
                         modifier = Modifier.verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-
                         if (total == 0) {
-
                             Text(
                                 text = "🛒",
                                 style = MaterialTheme.typography.displayLarge,
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center
-)
+                            )
 
                             Text(
                                 "Your cart is empty!",
@@ -352,11 +378,8 @@ fun StudentApp() {
                             ) {
                                 Text("Browse Menu")
                             }
-
                         } else {
-
                             menu.filter { (cart[it.id] ?: 0) > 0 }.forEach { food ->
-
                                 ElevatedCard {
                                     Row(
                                         modifier = Modifier
@@ -364,7 +387,6 @@ fun StudentApp() {
                                             .padding(12.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-
                                         Column(Modifier.weight(1f)) {
                                             Text(food.name)
                                             Text("₹${food.price} × ${cart[food.id]}")
@@ -373,7 +395,6 @@ fun StudentApp() {
                                         OutlinedButton(
                                             onClick = {
                                                 val n = (cart[food.id] ?: 0) - 1
-
                                                 if (n == 0) {
                                                     cart.remove(food.id)
                                                 } else {
@@ -420,9 +441,7 @@ fun StudentApp() {
                                 Text("Pre-Order", Modifier.padding(top = 12.dp))
                             }
 
-                            
                             if (orderMode == "Pre-Order") {
-
                                 PreOrderDateTimePicker(
                                     selectedTime = pickupTime,
                                     onTimeSelected = { pickupTime = it }
@@ -439,7 +458,6 @@ fun StudentApp() {
                                             .padding(16.dp),
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-
                                         Text(
                                             text = "💳 Pre-Order Payment",
                                             style = MaterialTheme.typography.titleMedium
@@ -478,7 +496,6 @@ fun StudentApp() {
                                     }
                                 }
                             }
-
 
                             Text("Order type")
 
@@ -551,9 +568,7 @@ fun StudentApp() {
                     }
                 }
 
-                
                 "orders" -> {
-
                     Text(
                         "My Orders",
                         style = MaterialTheme.typography.headlineSmall
@@ -567,30 +582,23 @@ fun StudentApp() {
                     Spacer(Modifier.height(12.dp))
 
                     if (orders.isEmpty()) {
-
                         Text("No orders yet. Please order food from the menu.")
-
                     } else {
-
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-
                             items(orders) { order ->
-
                                 var showDeleteDialog by remember { mutableStateOf(false) }
 
                                 ElevatedCard(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(16.dp),
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-
                                         Text(
                                             "Order ID: ${order.id}",
                                             style = MaterialTheme.typography.titleMedium
@@ -635,7 +643,6 @@ fun StudentApp() {
                                             style = MaterialTheme.typography.titleMedium
                                         )
 
-                                        // Show tracking only for recognized real order statuses
                                         val trackingSteps = listOf(
                                             "Pending",
                                             "Preparing",
@@ -646,7 +653,6 @@ fun StudentApp() {
                                         val currentStep = trackingSteps.indexOf(order.status)
 
                                         if (currentStep >= 0) {
-
                                             Text(
                                                 "Order Progress",
                                                 style = MaterialTheme.typography.titleSmall
@@ -654,14 +660,12 @@ fun StudentApp() {
 
                                             LinearProgressIndicator(
                                                 progress = {
-                                                    (currentStep + 1).toFloat() /
-                                                        trackingSteps.size
+                                                    (currentStep + 1).toFloat() / trackingSteps.size
                                                 },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
                                             trackingSteps.forEachIndexed { index, step ->
-
                                                 Text(
                                                     text = if (index <= currentStep)
                                                         "✓ $step"
@@ -683,7 +687,6 @@ fun StudentApp() {
                                             style = MaterialTheme.typography.titleSmall
                                         )
 
-                                       
                                         ElevatedCard(
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
@@ -712,8 +715,6 @@ fun StudentApp() {
                                             }
                                         }
 
-
-                                        // Delete Order Button
                                         Spacer(Modifier.height(8.dp))
 
                                         OutlinedButton(
@@ -727,7 +728,6 @@ fun StudentApp() {
                                                 color = MaterialTheme.colorScheme.error
                                             )
                                         }
-
 
                                         if (showDeleteDialog) {
                                             AlertDialog(
@@ -769,18 +769,12 @@ fun StudentApp() {
                                                 }
                                             )
                                         }
-
-
-
-
                                     }
                                 }
                             }
                         }
                     }
                 }
-
-
             }
         }
     }
