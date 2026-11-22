@@ -126,6 +126,8 @@ returned by registration as `Authorization: Bearer <student-token>`.
 | GET    | /api/owner/analytics/summary      | Revenue, order counts, average order                                                                                                                                                                   |
 | GET    | /api/owner/analytics/rush-hours   | Busiest hours                                                                                                                                                                                          |
 | GET    | /api/owner/analytics/top-dishes   | Top 10 dishes                                                                                                                                                                                          |
+| GET    | /api/owner/analytics/peak-days    | Completed orders and revenue for each weekday                                                                                                                                                           |
+| GET    | /api/owner/analytics/top-dishes-by-day | Top 5 dishes for each weekday                                                                                                                                                                      |
 
 Student flow: register using the join code shown by the canteen, save the returned token
 securely, call `GET /api/student/menu`, and then place orders with that token. Registration

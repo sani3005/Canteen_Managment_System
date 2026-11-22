@@ -93,6 +93,8 @@ Replace local seed credentials before deployment.
 | Owner | `GET` | `/api/owner/analytics/summary` | Get sales summary |
 | Owner | `GET` | `/api/owner/analytics/rush-hours` | Get busiest completed-order hours |
 | Owner | `GET` | `/api/owner/analytics/top-dishes` | Get the top 10 dishes |
+| Owner | `GET` | `/api/owner/analytics/peak-days` | Get completed orders and revenue by weekday |
+| Owner | `GET` | `/api/owner/analytics/top-dishes-by-day` | Get the top 5 dishes for each weekday |
 
 ---
 
@@ -825,7 +827,7 @@ All routes in this section require an owner bearer token. Analytics include comp
 
 ## `GET /api/owner/analytics/rush-hours`
 
-Returns hours in descending order of completed order count.
+Returns completed-order analytics for each hour from 9 through 17. Hours with no data are included with zero values.
 
 ### Response
 

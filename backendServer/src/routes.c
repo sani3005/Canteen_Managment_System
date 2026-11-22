@@ -61,6 +61,8 @@ static const Route routes[] = {
     { "GET",    "/api/owner/analytics/summary",     handle_get_analytics_summary,     1 },
     { "GET",    "/api/owner/analytics/rush-hours",  handle_get_analytics_rush_hours,  1 },
     { "GET",    "/api/owner/analytics/top-dishes",  handle_get_analytics_top_dishes,  1 },
+    { "GET",    "/api/owner/analytics/peak-days",   handle_get_analytics_peak_days,   1 },
+    { "GET",    "/api/owner/analytics/top-dishes-by-day", handle_get_analytics_top_dishes_by_day, 1 },
 };
 
 #define ROUTE_COUNT ((int)(sizeof(routes) / sizeof(routes[0])))

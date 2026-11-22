@@ -44,5 +44,7 @@ void handle_post_verify_otp(struct mg_connection *conn, const AuthContext *auth,
 void handle_get_analytics_summary(struct mg_connection *conn, const AuthContext *auth, const char *body);
 void handle_get_analytics_rush_hours(struct mg_connection *conn, const AuthContext *auth, const char *body);
 void handle_get_analytics_top_dishes(struct mg_connection *conn, const AuthContext *auth, const char *body);
+void handle_get_analytics_peak_days(struct mg_connection *conn, const AuthContext *auth, const char *body);
+void handle_get_analytics_top_dishes_by_day(struct mg_connection *conn, const AuthContext *auth, const char *body);
 
 #endif
