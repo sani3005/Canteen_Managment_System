@@ -107,10 +107,28 @@ int get_query_param(struct mg_connection *conn, const char *name, char *out, siz
 
 void generate_join_code(char *out, size_t out_size) {
     const char letters[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    char suffix[5];
-    for (int i = 0; i < 4; i++) suffix[i] = letters[rand() % (int)(sizeof(letters) - 1)];
-    suffix[4] = '\0';
-    snprintf(out, out_size, "CANT-%s", suffix);
+    if (out_size < 7) {
+        if (out_size > 0) out[0] = '\0';
+        return;
+    }
+
+    unsigned char random_bytes[6];
+    if (!generate_secure_random(random_bytes, sizeof(random_bytes))) {
+        for (size_t i = 0; i < 6; i++) {
+            unsigned int value;
+#ifdef _WIN32
+            value = (unsigned int)(rand() & 0xff);
+#else
+            value = (unsigned int)(rand() & 0xff);
+#endif
+            random_bytes[i] = (unsigned char)value;
+        }
+    }
+
+    for (size_t i = 0; i < 6; i++) {
+        out[i] = letters[random_bytes[i] % (sizeof(letters) - 1)];
+    }
+    out[6] = '\0';
 }
 
 int generate_secure_random(void *out, size_t size) {

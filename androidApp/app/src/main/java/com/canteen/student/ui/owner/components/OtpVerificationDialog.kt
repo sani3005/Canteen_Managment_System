@@ -120,7 +120,7 @@ fun OtpVerificationDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Ask the student for the 4-digit pickup code generated on their phone.",
+                    text = "Ask the student for the 6-digit pickup code generated on their phone.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -136,8 +136,7 @@ fun OtpVerificationDialog(
                             onOtpChange(newValue)
                         }
                     },
-                    label = { Text("4-Digit OTP") },
-                    placeholder = { Text("e.g. 4829") },
+                    label = { Text("6-Digit OTP") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     enabled = !isVerifying && successMessage == null,
@@ -219,7 +218,7 @@ fun OtpVerificationDialog(
             } else {
                 Button(
                     onClick = onVerify,
-                    enabled = otpInput.length >= 4 && !isVerifying,
+                    enabled = otpInput.length == 6 && !isVerifying,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     if (isVerifying) {

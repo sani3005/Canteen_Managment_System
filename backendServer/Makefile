@@ -8,7 +8,7 @@ CFLAGS  = -O2 -Wall -Wextra -Wno-unused-parameter -Iinclude -Icivetweb -DNO_SSL 
 
 ifeq ($(OS),Windows_NT)
   # Override MYSQL_DIR when MySQL is installed in a different location.
-  MYSQL_DIR ?= C:/Program Files/MySQL/MySQL Server 9.4
+  MYSQL_DIR ?= C:/Program Files/MySQL/MySQL Server 8.0
   CFLAGS  += -I"$(MYSQL_DIR)/include"
   LDFLAGS  = -L"$(MYSQL_DIR)/lib" -lmysql -lws2_32 -lbcrypt
   TARGET   = server.exe
@@ -36,4 +36,8 @@ civetweb/civetweb.o: civetweb/civetweb.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
+ifeq ($(OS),Windows_NT)
+	powershell.exe -NoProfile -Command "Remove-Item -Force -ErrorAction SilentlyContinue src/*.o,src/handlers/*.o,civetweb/civetweb.o,server.exe; exit 0"
+else
 	rm -f $(OBJS) $(TARGET)
+endif

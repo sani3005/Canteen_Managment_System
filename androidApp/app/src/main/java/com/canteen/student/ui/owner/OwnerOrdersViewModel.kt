@@ -111,8 +111,8 @@ class OwnerOrdersViewModel(
         val currentOrder = _uiState.value.selectedOrderForOtp ?: return
         val otp = _uiState.value.otpInput.trim()
 
-        if (otp.length < 4) {
-            _uiState.update { it.copy(otpErrorMessage = "Enter full 4-digit OTP") }
+        if (otp.length < 6) {
+            _uiState.update { it.copy(otpErrorMessage = "Enter full 6-digit OTP") }
             return
         }
 

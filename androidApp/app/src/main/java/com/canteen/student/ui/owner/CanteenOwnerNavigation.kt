@@ -3,7 +3,8 @@ package com.canteen.student.ui.owner
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Menu
@@ -56,23 +57,32 @@ sealed class OwnerScreen(
         selectedIcon = Icons.Filled.Info,
         unselectedIcon = Icons.Filled.Info
     )
+
+    object Profile : OwnerScreen(
+        route = "owner_profile",
+        title = "Profile",
+        selectedIcon = Icons.Filled.AccountCircle,
+        unselectedIcon = Icons.Filled.AccountCircle
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CanteenOwnerMainScreen(
-    onSwitchRoleOrLogout: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null,
     navController: NavHostController = rememberNavController()
 ) {
     val items = listOf(
         OwnerScreen.Orders,
         OwnerScreen.Menu,
-        OwnerScreen.Analytics
+        OwnerScreen.Analytics,
+        OwnerScreen.Profile
     )
 
     val ordersViewModel: OwnerOrdersViewModel = viewModel()
     val menuViewModel: MenuManagementViewModel = viewModel()
     val analyticsViewModel: AnalyticsViewModel = viewModel()
+    val profileViewModel: CanteenProfileViewModel = viewModel()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -80,11 +90,12 @@ fun CanteenOwnerMainScreen(
             TopAppBar(
                 title = { Text("Canteen Owner Portal", fontWeight = FontWeight.Bold) },
                 actions = {
-                    if (onSwitchRoleOrLogout != null) {
-                        IconButton(onClick = onSwitchRoleOrLogout) {
+                    if (onLogout != null) {
+                        IconButton(onClick = onLogout) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Switch Role / Logout"
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "Logout",
+                                tint = MaterialTheme.colorScheme.error
                             )
                         }
                     }
@@ -139,6 +150,9 @@ fun CanteenOwnerMainScreen(
             }
             composable(OwnerScreen.Analytics.route) {
                 AnalyticsScreen(viewModel = analyticsViewModel)
+            }
+            composable(OwnerScreen.Profile.route) {
+                CanteenProfileScreen(viewModel = profileViewModel)
             }
         }
     }

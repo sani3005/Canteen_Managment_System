@@ -13,12 +13,17 @@
 /* Public */
 void handle_health(struct mg_connection *conn, const AuthContext *auth, const char *body);
 void handle_student_register(struct mg_connection *conn, const AuthContext *auth, const char *body);
+void handle_student_login(struct mg_connection *conn, const AuthContext *auth, const char *body);
+void handle_owner_register(struct mg_connection *conn, const AuthContext *auth, const char *body);
+void handle_owner_login(struct mg_connection *conn, const AuthContext *auth, const char *body);
 void handle_get_student_menu(struct mg_connection *conn, const AuthContext *auth, const char *body);
 void handle_post_student_order(struct mg_connection *conn, const AuthContext *auth, const char *body);
 void handle_get_student_orders(struct mg_connection *conn, const AuthContext *auth, const char *body);
 
 /* Module 1: Canteen & join code */
 void handle_get_canteen(struct mg_connection *conn, const AuthContext *auth, const char *body);
+void handle_post_canteen(struct mg_connection *conn, const AuthContext *auth, const char *body);
+void handle_put_canteen(struct mg_connection *conn, const AuthContext *auth, const char *body);
 void handle_post_join_code(struct mg_connection *conn, const AuthContext *auth, const char *body);
 
 /* Module 2: Menu */

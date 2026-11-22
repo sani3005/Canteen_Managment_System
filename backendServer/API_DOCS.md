@@ -61,8 +61,8 @@ The bearer prefix is mandatory. Missing or malformed authentication returns `401
 For local development, `schema.sql` seeds:
 
 ```text
-Owner token: owner_secret_token_123
-Student token: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+Owner token: `<owner-token-from-users-table>`
+Student token: `<token-returned-by-registration>`
 ```
 
 Replace local seed credentials before deployment.
@@ -73,10 +73,14 @@ Replace local seed credentials before deployment.
 |---|---|---|---|
 | Public | `GET` | `/api/health` | Backend health check |
 | Public | `POST` | `/api/student/register` | Register a student and create an access token |
+| Public | `POST` | `/api/owner/register` | Create an owner account and canteen |
+| Public | `POST` | `/api/owner/login` | Verify owner credentials and create a session token |
 | Student | `GET` | `/api/student/menu` | Get the student's canteen menu |
 | Student | `POST` | `/api/student/orders` | Place an order |
 | Student | `GET` | `/api/student/orders` | Get the student's orders |
 | Owner | `GET` | `/api/owner/canteen` | Get canteen details |
+| Owner | `POST` | `/api/owner/canteen` | Create a canteen and generate its join code |
+| Owner | `PUT` | `/api/owner/canteen` | Update canteen details |
 | Owner | `POST` | `/api/owner/canteen/join-code` | Generate a new join code |
 | Owner | `GET` | `/api/owner/menu` | Get owner view of the menu |
 | Owner | `POST` | `/api/owner/menu/item` | Create a menu item |
@@ -123,9 +127,9 @@ Register a student for a canteen identified by its join code. The backend create
 
 ```json
 {
-  "full_name": "Sam Student",
+  "full_name": "<student-name>",
   "email": "sam@example.edu",
-  "join_code": "CANT-9021",
+  "join_code": "<canteen-join-code>",
   "phone": "9876543210",
   "student_number": "STU-2026"
 }
@@ -135,7 +139,7 @@ Register a student for a canteen identified by its join code. The backend create
 |---|---|---|---|
 | `full_name` | string | Yes | Not empty; maximum 100 characters |
 | `email` | string | Yes | Maximum 150 characters; must contain `@` and cannot start or end with `@` |
-| `join_code` | string | Yes | Maximum 20 characters; must identify an existing canteen |
+| `join_code` | string | Yes | Exactly 6 letters or digits; must identify an existing canteen |
 | `phone` | string | No | Maximum 30 characters |
 | `student_number` | string | No | Maximum 50 characters |
 
@@ -150,7 +154,7 @@ Register a student for a canteen identified by its join code. The backend create
   "data": {
     "student_id": 2,
     "canteen_id": 1,
-    "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "token": "<student-token>",
     "token_type": "Bearer"
   }
 }
@@ -163,7 +167,7 @@ Use the token with `Authorization: Bearer <token>`.
 | Status | Message |
 |---|---|
 | `400` | Invalid JSON in request body |
-| `400` | Provide valid full_name, email, and join_code; phone and student_number are optional |
+| `400` | Provide valid full_name, email, and a 6-character join_code; phone and student_number are optional |
 | `400` | Invalid canteen join_code |
 | `409` | This email is already registered for the selected canteen |
 | `500` | Registration or database failure |
@@ -192,8 +196,8 @@ Returns menu items belonging to the student's canteen, ordered by category and n
     "items": [
       {
         "item_id": 1,
-        "name": "Special Veg Thali",
-        "description": "Rice, Dal Makhani, 2 Roti, Paneer Sabzi, Salad",
+        "name": "<menu-item-name>",
+        "description": "<menu-item-description>",
         "price": 120,
         "is_available": true,
         "category": "Meals"
@@ -290,7 +294,7 @@ Returns only the authenticated student's orders, newest first.
         "status": "ready",
         "total_amount": 90,
         "created_at": "2026-11-21 18:30:00",
-        "pickup_otp": "839201"
+        "pickup_otp": "<generated-order-otp>"
       },
       {
         "order_id": 1,
@@ -314,6 +318,55 @@ Valid order statuses are `pending`, `preparing`, `ready`, `completed`, and `canc
 
 All routes in this section require an owner bearer token.
 
+## `POST /api/owner/canteen`
+
+Creates a canteen for an owner who does not already have one and generates a unique
+random 6-character uppercase alphanumeric join code.
+
+### Request Body
+
+```json
+{
+  "name": "<canteen-name>",
+  "owner_name": "<owner-name>",
+  "location": "<canteen-location>",
+  "photo_url": "<optional-photo-url>"
+}
+```
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `name` | string | Yes | Not empty; maximum 100 characters |
+| `owner_name` | string | Yes | Not empty; maximum 100 characters |
+| `location` | string | Yes | Not empty; maximum 255 characters |
+| `photo_url` | string or null | No | Maximum 2048 characters |
+
+### Success Response
+
+`201 Created`
+
+```json
+{
+  "status": "success",
+  "message": "Canteen created successfully",
+  "data": {
+    "canteen_id": 1,
+    "join_code": "CN7X9K"
+  }
+}
+```
+
+### Possible Errors
+
+| Status | Message |
+|---|---|
+| `400` | Invalid JSON in request body |
+| `400` | Provide name, owner_name, and location; photo_url is optional |
+| `409` | This owner already has an assigned canteen |
+| `500` | Canteen creation or database failure |
+
+---
+
 ## `GET /api/owner/canteen`
 
 Returns the canteen assigned to the authenticated owner.
@@ -328,8 +381,11 @@ Returns the canteen assigned to the authenticated owner.
   "message": "Canteen retrieved successfully",
   "data": {
     "canteen_id": 1,
-    "name": "Main Campus Cafeteria",
-    "join_code": "CANT-9021",
+    "name": "<canteen-name>",
+    "owner_name": "<owner-name>",
+    "location": "<canteen-location>",
+    "photo_url": "<photo-url-or-null>",
+    "join_code": "<6-character-canteen-code>",
     "created_at": "2026-11-21 12:00:00"
   }
 }
@@ -337,9 +393,46 @@ Returns the canteen assigned to the authenticated owner.
 
 ---
 
+## `PUT /api/owner/canteen`
+
+Updates the canteen profile assigned to the authenticated owner.
+
+### Request Body
+
+```json
+{
+  "name": "<canteen-name>",
+  "owner_name": "<owner-name>",
+  "location": "<canteen-location>",
+  "photo_url": "<optional-photo-url>"
+}
+```
+
+`photo_url` may be omitted or set to `null`. The `name`, `owner_name`, and `location` fields are required.
+
+### Success Response
+
+`200 OK`
+
+Returns the updated canteen object in the same shape as `GET /api/owner/canteen`.
+
+### Possible Errors
+
+| Status | Message |
+|---|---|
+| `400` | Invalid JSON in request body |
+| `400` | Provide name, owner_name, and location; photo_url is optional |
+| `400` | photo_url cannot exceed 2048 characters |
+| `404` | Canteen not found for this owner |
+| `500` | Canteen update or database failure |
+
+---
+
 ## `POST /api/owner/canteen/join-code`
 
-Generates a new random join code for the owner's canteen. This endpoint has no request body.
+Generates a new cryptographically random 6-character uppercase alphanumeric join code
+for the owner's canteen. This endpoint has no request body. The old join code is replaced
+and can no longer be used to register a student.
 
 ### Response
 
@@ -350,13 +443,19 @@ Generates a new random join code for the owner's canteen. This endpoint has no r
   "status": "success",
   "message": "Join code regenerated successfully",
   "data": {
-    "join_code": "CANT-AB12",
+    "join_code": "A3B8Z1",
     "canteen_id": 1
   }
 }
 ```
 
-The old join code is replaced and can no longer be used for registration.
+### Possible Errors
+
+| Status | Message |
+|---|---|
+| `500` | Failed to check join-code uniqueness |
+| `500` | Failed to update join code |
+| `500` | Could not generate a unique join code |
 
 ---
 
@@ -381,8 +480,8 @@ Returns every menu item in the owner's canteen, ordered by category and name.
     "items": [
       {
         "item_id": 1,
-        "name": "Special Veg Thali",
-        "description": "Rice, Dal Makhani, 2 Roti, Paneer Sabzi, Salad",
+        "name": "<menu-item-name>",
+        "description": "<menu-item-description>",
         "price": 120,
         "is_available": true,
         "category": "Meals",
@@ -579,7 +678,7 @@ Cancelled and completed orders are excluded.
       {
         "order_id": 1,
         "student_id": 2,
-        "student_name": "Robin Student",
+        "student_name": "<student-name>",
         "order_type": "dine_in",
         "packaging_label": "Dine-in",
         "is_preorder": false,
@@ -589,7 +688,7 @@ Cancelled and completed orders are excluded.
         "created_at": "2026-11-21 18:15:00",
         "items": [
           {
-            "name": "Special Veg Thali",
+            "name": "<menu-item-name>",
             "quantity": 1,
             "unit_price": 120,
             "subtotal": 120
@@ -657,7 +756,7 @@ Verifies the student's six-digit pickup OTP and marks the order completed.
 ```json
 {
   "order_id": 1,
-  "otp": "412356"
+  "otp": "<order-otp>"
 }
 ```
 
@@ -768,7 +867,7 @@ Returns the top 10 dishes by units sold across completed orders.
       {
         "rank": 1,
         "item_id": 4,
-        "name": "Aloo Samosa (2 pcs)",
+        "name": "<menu-item-name>",
         "category": "Snacks",
         "total_units_sold": 8,
         "total_revenue": 240
@@ -814,8 +913,36 @@ Invalid student token:
 Owner canteen:
 
 ```bash
-curl -H "Authorization: Bearer owner_secret_token_123" \
+curl -H "Authorization: Bearer <owner-token>" \
   http://localhost:8080/api/owner/canteen
+```
+
+Create an owner canteen:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <owner-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Main Canteen","owner_name":"Canteen Owner","location":"Building A","photo_url":"https://example.com/canteen.jpg"}' \
+  http://localhost:8080/api/owner/canteen
+```
+
+Update an owner canteen:
+
+```bash
+curl -X PUT \
+  -H "Authorization: Bearer <owner-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Main Canteen","owner_name":"Canteen Owner","location":"Building B","photo_url":null}' \
+  http://localhost:8080/api/owner/canteen
+```
+
+Regenerate a join code:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <owner-token>" \
+  http://localhost:8080/api/owner/canteen/join-code
 ```
 
 Student registration:
@@ -823,7 +950,7 @@ Student registration:
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"full_name":"Sam Student","email":"sam@example.edu","join_code":"CANT-9021","phone":"9876543210","student_number":"STU-2026"}' \
+  -d '{"full_name":"<student-name>","email":"<student-email>","join_code":"<canteen-join-code>","phone":"<phone>","student_number":"<student-number>"}' \
   http://localhost:8080/api/student/register
 ```
 
@@ -841,8 +968,8 @@ Verify pickup OTP:
 
 ```bash
 curl -X POST \
-  -H "Authorization: Bearer owner_secret_token_123" \
+  -H "Authorization: Bearer <owner-token>" \
   -H "Content-Type: application/json" \
-  -d '{"order_id":1,"otp":"412356"}' \
+  -d '{"order_id":1,"otp":"<order-otp>"}' \
   http://localhost:8080/api/owner/orders/verify-otp
 ```

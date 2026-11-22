@@ -10,6 +10,8 @@ import com.canteen.student.data.model.PlaceOrderRequest
 import com.canteen.student.data.model.StudentOrderResponse
 import com.canteen.student.data.model.StudentRegisterData
 import com.canteen.student.data.model.StudentRegisterRequest
+import com.canteen.student.data.model.StudentLoginData
+import com.canteen.student.data.model.StudentLoginRequest
 import com.google.gson.Gson
 import retrofit2.Response
 
@@ -21,9 +23,10 @@ interface StudentRepository {
         fullName: String,
         email: String,
         joinCode: String,
-        phone: String? = null,
-        studentNumber: String? = null
+        password: String,
+        phone: String? = null
     ): Result<StudentRegisterData>
+    suspend fun loginStudent(email: String, password: String): Result<StudentLoginData>
 
     suspend fun getMenu(): Result<List<MenuItem>>
     suspend fun placeOrder(orderType: String, items: List<OrderItemInput>): Result<PlaceOrderData>
@@ -79,17 +82,23 @@ class StudentRepositoryImpl(
         fullName: String,
         email: String,
         joinCode: String,
-        phone: String?,
-        studentNumber: String?
+        password: String,
+        phone: String?
     ): Result<StudentRegisterData> = runCatching {
         val req = StudentRegisterRequest(
             fullName = fullName.trim(),
             email = email.trim(),
             joinCode = joinCode.trim(),
-            phone = phone?.trim().takeIf { !it.isNullOrEmpty() },
-            studentNumber = studentNumber?.trim().takeIf { !it.isNullOrEmpty() }
+            password = password,
+            phone = phone?.trim().takeIf { !it.isNullOrEmpty() }
         )
         val response = apiService.registerStudent(req)
+        handleApiResponse(response)
+    }
+
+    override suspend fun loginStudent(email: String, password: String): Result<StudentLoginData> = runCatching {
+        val req = StudentLoginRequest(email = email.trim(), password = password)
+        val response = apiService.loginStudent(req)
         handleApiResponse(response)
     }
 

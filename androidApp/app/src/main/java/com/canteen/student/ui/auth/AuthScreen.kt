@@ -19,18 +19,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,10 +50,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.canteen.student.data.api.SessionManager
+import com.canteen.student.data.model.CanteenCodeUtils
+import com.canteen.student.data.repository.CanteenRepositoryImpl
 import com.canteen.student.data.repository.StudentRepositoryImpl
 import kotlinx.coroutines.launch
 
@@ -64,6 +70,15 @@ enum class AuthMode {
     SIGN_UP
 }
 
+private fun isValidEmail(email: String): Boolean {
+    val trimmed = email.trim()
+    if (trimmed.isBlank()) return false
+    val atIndex = trimmed.indexOf('@')
+    val dotIndex = trimmed.lastIndexOf('.')
+    return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < trimmed.length - 1 && !trimmed.contains(" ")
+}
+
+
 @Composable
 fun AuthScreen(
     onLoginSuccess: (UserRole) -> Unit
@@ -74,69 +89,196 @@ fun AuthScreen(
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
     var phone by remember { mutableStateOf("") }
-    var joinCode by remember { mutableStateOf("CANT-9021") }
+    var joinCode by remember { mutableStateOf("") }
     var canteenName by remember { mutableStateOf("") }
+    var canteenLocation by remember { mutableStateOf("") }
 
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
     val studentRepo = remember { StudentRepositoryImpl() }
+    val canteenRepo = remember { CanteenRepositoryImpl() }
 
     fun handleAuthSubmit() {
-        if (email.isBlank()) {
-            errorMessage = "Please enter an email address."
-            return
-        }
+        val trimmedEmail = email.trim()
+        val trimmedPassword = password.trim()
+        val trimmedFullName = fullName.trim()
+        val trimmedCanteenName = canteenName.trim()
+        val trimmedLocation = canteenLocation.trim()
+        val trimmedJoinCode = joinCode.trim().uppercase()
 
         errorMessage = null
 
         if (selectedRole == UserRole.STUDENT) {
+            if (!isValidEmail(trimmedEmail)) {
+                errorMessage = "Please enter a valid email address (e.g. user@example.com)."
+                return
+            }
+
+            if (trimmedPassword.length < 4) {
+                errorMessage = "Please enter a password with at least 4 characters."
+                return
+            }
+
             if (authMode == AuthMode.SIGN_UP) {
-                if (fullName.isBlank()) {
+                if (trimmedFullName.isBlank()) {
                     errorMessage = "Please enter your full name."
                     return
                 }
-                if (joinCode.isBlank()) {
-                    errorMessage = "Please enter a valid canteen join code."
+                if (trimmedJoinCode.isBlank() || !CanteenCodeUtils.isValidCode(trimmedJoinCode)) {
+                    errorMessage = "Please enter a valid 6-character canteen join code."
                     return
                 }
 
                 isLoading = true
                 scope.launch {
                     studentRepo.registerStudent(
-                        fullName = fullName,
-                        email = email,
-                        joinCode = joinCode,
-                        phone = phone,
-                        studentNumber = null
+                        fullName = trimmedFullName,
+                        email = trimmedEmail,
+                        joinCode = trimmedJoinCode,
+                        password = trimmedPassword,
+                        phone = phone.trim().takeIf { it.isNotBlank() }
                     ).onSuccess { registerData ->
                         isLoading = false
                         SessionManager.setStudentSession(
                             token = registerData.token,
                             sId = registerData.studentId,
                             cId = registerData.canteenId,
-                            name = fullName,
-                            email = email
+                            name = trimmedFullName,
+                            email = trimmedEmail
                         )
                         onLoginSuccess(UserRole.STUDENT)
                     }.onFailure { throwable ->
                         isLoading = false
-                        errorMessage = throwable.localizedMessage ?: "Student registration failed"
+                        val errorMsg = throwable.localizedMessage ?: "Student registration failed"
+                        errorMessage = if (errorMsg.contains("already registered", ignoreCase = true) || errorMsg.contains("409")) {
+                            "This email is already registered for this canteen. Please switch to 'Log In' to sign in."
+                        } else if (errorMsg.contains("join_code", ignoreCase = true) || errorMsg.contains("Invalid canteen")) {
+                            "Invalid 6-character canteen join code. Please ask your canteen owner for the correct code."
+                        } else {
+                            errorMsg
+                        }
                     }
                 }
             } else {
-                SessionManager.setStudentSession(
-                    token = SessionManager.DEFAULT_STUDENT_TOKEN,
-                    name = email,
-                    email = email
-                )
-                onLoginSuccess(UserRole.STUDENT)
+                // STUDENT LOGIN
+                isLoading = true
+                scope.launch {
+                    studentRepo.loginStudent(trimmedEmail, trimmedPassword)
+                        .onSuccess { loginData ->
+                            isLoading = false
+                            SessionManager.setStudentSession(
+                                token = loginData.token,
+                                sId = loginData.studentId,
+                                cId = loginData.canteenId,
+                                name = loginData.fullName,
+                                email = trimmedEmail
+                            )
+                            onLoginSuccess(UserRole.STUDENT)
+                        }
+                        .onFailure { throwable ->
+                            isLoading = false
+                            SessionManager.clearSession()
+                            val primaryMsg = throwable.localizedMessage ?: ""
+                            val isUnauthorized = primaryMsg.contains("Forbidden", ignoreCase = true) ||
+                                    primaryMsg.contains("token", ignoreCase = true) ||
+                                    primaryMsg.contains("403") || primaryMsg.contains("401")
+
+                            errorMessage = if (isUnauthorized) {
+                                "Student account not found or invalid credentials. If you haven't registered yet, please tap 'Sign Up'."
+                            } else {
+                                primaryMsg.ifBlank { "Unable to connect to canteen server. Please check your network or server status." }
+                            }
+                        }
+                }
             }
         } else {
-            SessionManager.setOwnerSession(SessionManager.DEFAULT_OWNER_TOKEN)
-            onLoginSuccess(UserRole.OWNER)
+            // OWNER ROLE
+            if (trimmedPassword.isBlank()) {
+                errorMessage = "Please enter your password."
+                return
+            }
+
+            if (authMode == AuthMode.SIGN_UP) {
+                if (trimmedFullName.isBlank()) {
+                    errorMessage = "Please enter your owner full name."
+                    return
+                }
+                if (trimmedCanteenName.isBlank()) {
+                    errorMessage = "Please enter your canteen name."
+                    return
+                }
+                if (trimmedLocation.isBlank()) {
+                    errorMessage = "Please enter your canteen location."
+                    return
+                }
+
+                isLoading = true
+                scope.launch {
+                    canteenRepo.registerOwner(
+                        fullName = trimmedFullName,
+                        email = trimmedEmail,
+                        password = trimmedPassword,
+                        canteenName = trimmedCanteenName,
+                        location = trimmedLocation,
+                        photoUrl = null
+                    ).onSuccess { regData ->
+                        isLoading = false
+                        SessionManager.setOwnerSession(
+                            token = regData.token,
+                            cName = trimmedCanteenName,
+                            oName = trimmedFullName,
+                            loc = trimmedLocation,
+                            code = regData.joinCode
+                        )
+                        onLoginSuccess(UserRole.OWNER)
+                    }.onFailure { throwable ->
+                        isLoading = false
+                        SessionManager.clearSession()
+                        val errMsg = throwable.localizedMessage ?: "Owner registration failed."
+                        errorMessage = if (errMsg.contains("already registered", ignoreCase = true) || errMsg.contains("409")) {
+                            "This email is already registered as an owner. Please switch to 'Log In'."
+                        } else {
+                            errMsg
+                        }
+                    }
+                }
+            } else {
+                // OWNER LOGIN
+                isLoading = true
+                scope.launch {
+                    canteenRepo.loginOwner(
+                        email = trimmedEmail,
+                        password = trimmedPassword
+                    ).onSuccess { loginData ->
+                        isLoading = false
+                        SessionManager.setOwnerSession(
+                            token = loginData.token,
+                            cName = loginData.name,
+                            oName = loginData.ownerName,
+                            loc = loginData.location,
+                            code = loginData.joinCode
+                        )
+                        onLoginSuccess(UserRole.OWNER)
+                    }.onFailure { throwable ->
+                        isLoading = false
+                        SessionManager.clearSession()
+                        val errStr = throwable.localizedMessage ?: ""
+                        val isUnauthorized = errStr.contains("Forbidden", ignoreCase = true) ||
+                                errStr.contains("token", ignoreCase = true) ||
+                                errStr.contains("403") || errStr.contains("401")
+
+                        errorMessage = if (isUnauthorized) {
+                            "Invalid email or password for canteen owner account."
+                        } else {
+                            errStr.ifBlank { "Unable to connect to server. Please check your network or server status." }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -152,41 +294,30 @@ fun AuthScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // App Logo & Header
             Text(
-                text = "🍔 Campus Canteen Hub",
+                text = "Namaste 🙏",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Order food easily or manage canteen orders",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 50.dp)
             )
 
-            // User Role Selector Cards
             Text(
                 text = "Select User Type",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(bottom = 8.dp)
+                    .align(Alignment.CenterHorizontally)
             )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Student / Faculty Role Card
                 RoleCard(
                     title = "Student / Faculty",
-                    subtitle = "Order food & track status",
                     icon = Icons.Default.AccountBox,
                     isSelected = selectedRole == UserRole.STUDENT,
                     onClick = {
@@ -196,10 +327,8 @@ fun AuthScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Canteen Owner Role Card
                 RoleCard(
                     title = "Canteen Owner",
-                    subtitle = "Manage menu & orders",
                     icon = Icons.Default.Home,
                     isSelected = selectedRole == UserRole.OWNER,
                     onClick = {
@@ -212,7 +341,6 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Main Auth Form Card
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -225,10 +353,7 @@ fun AuthScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = if (authMode == AuthMode.LOGIN)
-                            "Welcome Back (${if (selectedRole == UserRole.STUDENT) "Student/Faculty" else "Canteen Owner"})"
-                        else
-                            "Create Account (${if (selectedRole == UserRole.STUDENT) "Student/Faculty" else "Canteen Owner"})",
+                        text = "Welcome Back",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -236,24 +361,33 @@ fun AuthScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Sign Up Specific Fields
                     if (authMode == AuthMode.SIGN_UP) {
-                        if (selectedRole == UserRole.STUDENT) {
+                        OutlinedTextField(
+                            value = fullName,
+                            onValueChange = { fullName = it },
+                            label = { Text(if (selectedRole == UserRole.STUDENT) "Full Name *" else "Owner Full Name *") },
+                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        if (selectedRole == UserRole.OWNER) {
                             OutlinedTextField(
-                                value = fullName,
-                                onValueChange = { fullName = it },
-                                label = { Text("Full Name") },
-                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                                value = canteenName,
+                                onValueChange = { canteenName = it },
+                                label = { Text("Canteen Name *") },
+                                leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(12.dp))
-                        } else {
+
                             OutlinedTextField(
-                                value = canteenName,
-                                onValueChange = { canteenName = it },
-                                label = { Text("Canteen Name") },
-                                leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
+                                value = canteenLocation,
+                                onValueChange = { canteenLocation = it },
+                                label = { Text("Canteen Location *") },
+                                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -261,11 +395,10 @@ fun AuthScreen(
                         }
                     }
 
-                    // Email / ID Field
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text(if (selectedRole == UserRole.STUDENT) "Email Address" else "Owner Email") },
+                        label = { Text(if (selectedRole == UserRole.STUDENT) "Email Address *" else "Owner Email *") },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -274,14 +407,21 @@ fun AuthScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Password Field
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Password") },
+                        label = { Text("Password *") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        trailingIcon = {
+                            IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (isPasswordVisible) "Hide password" else "Show password"
+                                )
+                            }
+                        },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
+                        visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -303,7 +443,7 @@ fun AuthScreen(
                             OutlinedTextField(
                                 value = joinCode,
                                 onValueChange = { joinCode = it },
-                                label = { Text("Canteen Join Code (e.g. CANT-9021)") },
+                                label = { Text("Canteen Join Code * (6-character code)") },
                                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
@@ -311,7 +451,6 @@ fun AuthScreen(
                         }
                     }
 
-                    // Error Message Banner
                     AnimatedVisibility(visible = errorMessage != null) {
                         errorMessage?.let { error ->
                             Text(
@@ -325,7 +464,6 @@ fun AuthScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Submit Button
                     Button(
                         onClick = { handleAuthSubmit() },
                         enabled = !isLoading,
@@ -351,7 +489,6 @@ fun AuthScreen(
                         }
                     }
 
-                    // Switch Mode Toggle (Login <-> Sign Up)
                     TextButton(
                         onClick = {
                             authMode = if (authMode == AuthMode.LOGIN) AuthMode.SIGN_UP else AuthMode.LOGIN
@@ -368,53 +505,6 @@ fun AuthScreen(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Quick Access Section
-            Text(
-                text = "⚡ Quick Access Mode",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        SessionManager.setStudentSession(SessionManager.DEFAULT_STUDENT_TOKEN)
-                        onLoginSuccess(UserRole.STUDENT)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "Student Mode",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        SessionManager.setOwnerSession(SessionManager.DEFAULT_OWNER_TOKEN)
-                        onLoginSuccess(UserRole.OWNER)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "Owner Mode",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
         }
     }
 }
@@ -422,7 +512,6 @@ fun AuthScreen(
 @Composable
 fun RoleCard(
     title: String,
-    subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -468,13 +557,6 @@ fun RoleCard(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }

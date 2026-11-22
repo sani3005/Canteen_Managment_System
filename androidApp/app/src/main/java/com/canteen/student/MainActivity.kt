@@ -11,7 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -24,7 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.canteen.student.data.model.MenuItem
+import com.canteen.student.data.api.SessionManager
 import com.canteen.student.ui.auth.AuthScreen
 import com.canteen.student.ui.auth.UserRole
 import com.canteen.student.ui.owner.CanteenOwnerMainScreen
@@ -33,6 +33,7 @@ import com.canteen.student.ui.student.StudentViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SessionManager.init(applicationContext)
         setContent {
             MaterialTheme {
                 MainAppHost()
@@ -43,7 +44,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppHost() {
-    var currentUserRole by remember { mutableStateOf<UserRole?>(null) }
+    var currentUserRole by remember {
+        mutableStateOf(if (SessionManager.isLoggedIn) SessionManager.currentRole else null)
+    }
 
     when (currentUserRole) {
         null -> {
@@ -55,14 +58,16 @@ fun MainAppHost() {
         }
         UserRole.STUDENT -> {
             StudentApp(
-                onSwitchRoleOrLogout = {
+                onLogout = {
+                    SessionManager.clearSession()
                     currentUserRole = null
                 }
             )
         }
         UserRole.OWNER -> {
             CanteenOwnerMainScreen(
-                onSwitchRoleOrLogout = {
+                onLogout = {
+                    SessionManager.clearSession()
                     currentUserRole = null
                 }
             )
@@ -73,7 +78,7 @@ fun MainAppHost() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentApp(
-    onSwitchRoleOrLogout: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null,
     viewModel: StudentViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -105,11 +110,13 @@ fun StudentApp(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "Canteen Student • ${page.replaceFirstChar { it.uppercase() }}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            "Campus Canteen",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = {
                             viewModel.fetchMenu()
@@ -120,11 +127,12 @@ fun StudentApp(
                                 contentDescription = "Sync Backend Data"
                             )
                         }
-                        if (onSwitchRoleOrLogout != null) {
-                            IconButton(onClick = onSwitchRoleOrLogout) {
+                        if (onLogout != null) {
+                            IconButton(onClick = onLogout) {
                                 Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Switch Role / Logout"
+                                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                    contentDescription = "Logout",
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
                         }

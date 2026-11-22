@@ -28,7 +28,7 @@ char *read_body(struct mg_connection *conn);
 /* Read ?name=value from the URL. Returns 1 if found. */
 int get_query_param(struct mg_connection *conn, const char *name, char *out, size_t out_size);
 
-/* Make a join code like CANT-7K2Q */
+/* Make a 6-character uppercase alphanumeric join code like CN7X9K */
 void generate_join_code(char *out, size_t out_size);
 
 /* Fill a buffer with cryptographically secure random bytes. */

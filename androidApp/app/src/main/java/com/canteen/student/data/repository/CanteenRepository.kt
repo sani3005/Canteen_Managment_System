@@ -2,15 +2,24 @@ package com.canteen.student.data.repository
 
 import com.canteen.student.data.api.CanteenApiService
 import com.canteen.student.data.api.NetworkClient
+import com.canteen.student.data.api.SessionManager
 import com.canteen.student.data.model.ApiResponse
 import com.canteen.student.data.model.AnalyticsSummary
+import com.canteen.student.data.model.CanteenInfo
+import com.canteen.student.data.model.CreateCanteenData
+import com.canteen.student.data.model.CreateCanteenRequest
 import com.canteen.student.data.model.CreateMenuItemRequest
 import com.canteen.student.data.model.MenuItem
 import com.canteen.student.data.model.Order
 import com.canteen.student.data.model.OrderStatus
 import com.canteen.student.data.model.OtpVerificationRequest
 import com.canteen.student.data.model.OtpVerificationResponse
+import com.canteen.student.data.model.OwnerLoginData
+import com.canteen.student.data.model.OwnerLoginRequest
+import com.canteen.student.data.model.OwnerRegisterData
+import com.canteen.student.data.model.OwnerRegisterRequest
 import com.canteen.student.data.model.ToggleStockRequest
+import com.canteen.student.data.model.UpdateCanteenInfoRequest
 import com.canteen.student.data.model.UpdateMenuItemRequest
 import com.canteen.student.data.model.UpdateOrderStatusRequest
 import com.google.gson.Gson
@@ -29,6 +38,25 @@ interface CanteenRepository {
     suspend fun updateOrderStatus(id: String, status: OrderStatus): Result<Order>
     suspend fun verifyOtp(id: String, otp: String): Result<OtpVerificationResponse>
     suspend fun getAnalytics(): Result<AnalyticsSummary>
+
+    suspend fun createCanteen(name: String, ownerName: String, location: String, photoUrl: String?): Result<CreateCanteenData>
+    suspend fun getCanteenInfo(): Result<CanteenInfo>
+    suspend fun updateCanteenInfo(name: String, ownerName: String, location: String, photoUrl: String?): Result<CanteenInfo>
+    suspend fun regenerateJoinCode(): Result<String>
+
+    suspend fun registerOwner(
+        fullName: String,
+        email: String,
+        password: String,
+        canteenName: String,
+        location: String,
+        photoUrl: String? = null
+    ): Result<OwnerRegisterData>
+
+    suspend fun loginOwner(
+        email: String,
+        password: String
+    ): Result<OwnerLoginData>
 }
 
 /**
@@ -54,12 +82,12 @@ class CanteenRepositoryImpl(
                     @Suppress("UNCHECKED_CAST")
                     return Unit as T
                 }
-                throw Exception("Response data is null")
+                throw Exception("Response data is empty")
             }
-            throw Exception("Response body is null")
+            throw Exception("Response body is empty")
         } else {
             val errorBodyString = response.errorBody()?.string()
-            if (!errorBodyString.isNull_or_Empty()) {
+            if (!errorBodyString.isNullOrEmpty()) {
                 try {
                     val apiErr = gson.fromJson(errorBodyString, ApiResponse::class.java)
                     if (!apiErr?.message.isNullOrEmpty()) {
@@ -75,8 +103,6 @@ class CanteenRepositoryImpl(
             throw Exception("Server returned HTTP error code ${response.code()}")
         }
     }
-
-    private fun String?.isNull_or_Empty(): Boolean = this == null || this.isEmpty()
 
     override suspend fun getMenu(): Result<List<MenuItem>> = runCatching {
         val response = apiService.getOwnerMenu()
@@ -117,7 +143,7 @@ class CanteenRepositoryImpl(
         val toggleData = handleApiResponse(response)
         MenuItem(
             itemId = toggleData.itemId,
-            name = "Item #$id",
+            name = "",
             price = 0.0,
             isAvailable = toggleData.isAvailable
         )
@@ -191,5 +217,101 @@ class CanteenRepositoryImpl(
             rushHours = rushData.peakRushHours,
             recentOrders = emptyList()
         )
+    }
+
+    override suspend fun createCanteen(
+        name: String,
+        ownerName: String,
+        location: String,
+        photoUrl: String?
+    ): Result<CreateCanteenData> = runCatching {
+        val req = CreateCanteenRequest(
+            name = name,
+            ownerName = ownerName,
+            location = location,
+            photoUrl = photoUrl
+        )
+        val response = apiService.createCanteen(req)
+        val data = handleApiResponse(response)
+        SessionManager.canteenId = data.canteenId
+        SessionManager.canteenJoinCode = data.joinCode
+        SessionManager.canteenName = name
+        SessionManager.ownerName = ownerName
+        SessionManager.canteenLocation = location
+        SessionManager.canteenPhotoUrl = photoUrl
+        data
+    }
+
+    override suspend fun getCanteenInfo(): Result<CanteenInfo> = runCatching {
+        val response = apiService.getCanteenInfo()
+        val info = handleApiResponse(response)
+        SessionManager.canteenId = info.canteenId
+        SessionManager.canteenJoinCode = info.joinCode
+        SessionManager.canteenName = info.name
+        SessionManager.ownerName = info.ownerName
+        SessionManager.canteenLocation = info.location
+        SessionManager.canteenPhotoUrl = info.photoUrl
+        info
+    }
+
+    override suspend fun updateCanteenInfo(
+        name: String,
+        ownerName: String,
+        location: String,
+        photoUrl: String?
+    ): Result<CanteenInfo> = runCatching {
+        val req = UpdateCanteenInfoRequest(
+            name = name,
+            ownerName = ownerName,
+            location = location,
+            photoUrl = photoUrl
+        )
+        val response = apiService.updateCanteenInfo(req)
+        val updated = handleApiResponse(response)
+        SessionManager.canteenName = updated.name
+        SessionManager.ownerName = updated.ownerName
+        SessionManager.canteenLocation = updated.location
+        SessionManager.canteenPhotoUrl = updated.photoUrl
+        SessionManager.canteenJoinCode = updated.joinCode
+        updated
+    }
+
+    override suspend fun regenerateJoinCode(): Result<String> = runCatching {
+        val response = apiService.regenerateJoinCode()
+        val data = handleApiResponse(response)
+        SessionManager.canteenJoinCode = data.joinCode
+        data.joinCode
+    }
+
+    override suspend fun registerOwner(
+        fullName: String,
+        email: String,
+        password: String,
+        canteenName: String,
+        location: String,
+        photoUrl: String?
+    ): Result<OwnerRegisterData> = runCatching {
+        val req = OwnerRegisterRequest(
+            fullName = fullName,
+            email = email,
+            password = password,
+            canteenName = canteenName,
+            location = location,
+            photoUrl = photoUrl
+        )
+        val response = apiService.registerOwner(req)
+        handleApiResponse(response)
+    }
+
+    override suspend fun loginOwner(
+        email: String,
+        password: String
+    ): Result<OwnerLoginData> = runCatching {
+        val req = OwnerLoginRequest(
+            email = email,
+            password = password
+        )
+        val response = apiService.loginOwner(req)
+        handleApiResponse(response)
     }
 }

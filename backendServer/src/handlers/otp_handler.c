@@ -55,7 +55,7 @@ void handle_patch_order_status(struct mg_connection *conn, const AuthContext *au
     send_success(conn, 200, "Order status updated", data);
 }
 
-/* POST /api/owner/orders/verify-otp   body: {"order_id":1,"otp":"412356"}
+/* POST /api/owner/orders/verify-otp
  * The student shows a 6-digit OTP when collecting food. If it matches,
  * the order is marked completed. */
 void handle_post_verify_otp(struct mg_connection *conn, const AuthContext *auth, const char *body) {

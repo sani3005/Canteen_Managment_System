@@ -16,14 +16,27 @@ data class ApiResponse<T>(
 data class StudentRegisterRequest(
     @SerializedName("full_name") val fullName: String,
     @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String,
     @SerializedName("join_code") val joinCode: String,
-    @SerializedName("phone") val phone: String? = null,
-    @SerializedName("student_number") val studentNumber: String? = null
+    @SerializedName("phone") val phone: String? = null
 )
 
 data class StudentRegisterData(
     @SerializedName("student_id") val studentId: Int,
     @SerializedName("canteen_id") val canteenId: Int,
+    @SerializedName("token") val token: String,
+    @SerializedName("token_type") val tokenType: String
+)
+
+data class StudentLoginRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String
+)
+
+data class StudentLoginData(
+    @SerializedName("student_id") val studentId: Int,
+    @SerializedName("canteen_id") val canteenId: Int,
+    @SerializedName("full_name") val fullName: String? = null,
     @SerializedName("token") val token: String,
     @SerializedName("token_type") val tokenType: String
 )
@@ -68,11 +81,84 @@ data class StudentOrderResponse(
 
 // --- OWNER CANTEEN DTOs ---
 
-data class CanteenInfo(
-    @SerializedName("canteen_id") val canteenId: Int,
+object CanteenCodeUtils {
+    /**
+     * Generates a random 6-character uppercase alphanumeric code (e.g., "CN7X9K", "A3B8Z1").
+     */
+    fun generate6CharAlphanumericCode(): String {
+        val allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return (1..6)
+            .map { allowedChars.random() }
+            .joinToString("")
+    }
+
+    /**
+     * Validates if a string is a 6-character alphanumeric code.
+     */
+    fun isValidCode(code: String): Boolean {
+        return code.trim().length == 6 && code.trim().all { it.isLetterOrDigit() }
+    }
+}
+
+data class CreateCanteenRequest(
     @SerializedName("name") val name: String,
-    @SerializedName("join_code") val joinCode: String,
-    @SerializedName("created_at") val createdAt: String
+    @SerializedName("owner_name") val ownerName: String,
+    @SerializedName("location") val location: String,
+    @SerializedName("photo_url") val photoUrl: String? = null
+)
+
+data class CreateCanteenData(
+    @SerializedName("canteen_id") val canteenId: Int,
+    @SerializedName("join_code") val joinCode: String
+)
+
+data class OwnerRegisterRequest(
+    @SerializedName("full_name") val fullName: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("canteen_name") val canteenName: String,
+    @SerializedName("location") val location: String,
+    @SerializedName("photo_url") val photoUrl: String? = null
+)
+
+data class OwnerRegisterData(
+    @SerializedName("canteen_id") val canteenId: Int = 0,
+    @SerializedName("join_code") val joinCode: String = "",
+    @SerializedName("token") val token: String = "",
+    @SerializedName("token_type") val tokenType: String = "Bearer"
+)
+
+data class OwnerLoginRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String
+)
+
+data class OwnerLoginData(
+    @SerializedName("canteen_id") val canteenId: Int = 0,
+    @SerializedName("name") val name: String = "",
+    @SerializedName("owner_name") val ownerName: String = "",
+    @SerializedName("location") val location: String = "",
+    @SerializedName("photo_url") val photoUrl: String? = null,
+    @SerializedName("join_code") val joinCode: String = "",
+    @SerializedName("token") val token: String = "",
+    @SerializedName("token_type") val tokenType: String = "Bearer"
+)
+
+data class CanteenInfo(
+    @SerializedName("canteen_id") val canteenId: Int = 0,
+    @SerializedName("name") val name: String = "",
+    @SerializedName("owner_name") val ownerName: String = "",
+    @SerializedName("location") val location: String = "",
+    @SerializedName("photo_url") val photoUrl: String? = null,
+    @SerializedName("join_code") val joinCode: String = "",
+    @SerializedName("created_at") val createdAt: String = ""
+)
+
+data class UpdateCanteenInfoRequest(
+    @SerializedName("name") val name: String,
+    @SerializedName("owner_name") val ownerName: String,
+    @SerializedName("location") val location: String,
+    @SerializedName("photo_url") val photoUrl: String? = null
 )
 
 data class JoinCodeData(

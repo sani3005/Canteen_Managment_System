@@ -3,6 +3,8 @@ package com.canteen.student.data.api
 import com.canteen.student.data.model.ApiResponse
 import com.canteen.student.data.model.AnalyticsSummaryData
 import com.canteen.student.data.model.CanteenInfo
+import com.canteen.student.data.model.CreateCanteenData
+import com.canteen.student.data.model.CreateCanteenRequest
 import com.canteen.student.data.model.CreateMenuItemRequest
 import com.canteen.student.data.model.ItemCreatedResponse
 import com.canteen.student.data.model.ItemDeletedResponse
@@ -13,16 +15,23 @@ import com.canteen.student.data.model.MenuDataResponse
 import com.canteen.student.data.model.OrderStatusData
 import com.canteen.student.data.model.OtpVerificationRequest
 import com.canteen.student.data.model.OtpVerifyData
+import com.canteen.student.data.model.OwnerLoginData
+import com.canteen.student.data.model.OwnerLoginRequest
+import com.canteen.student.data.model.OwnerRegisterData
+import com.canteen.student.data.model.OwnerRegisterRequest
 import com.canteen.student.data.model.PlaceOrderData
 import com.canteen.student.data.model.PlaceOrderRequest
 import com.canteen.student.data.model.RushHoursData
 import com.canteen.student.data.model.StudentMenuData
+import com.canteen.student.data.model.StudentLoginData
+import com.canteen.student.data.model.StudentLoginRequest
 import com.canteen.student.data.model.StudentOrdersData
 import com.canteen.student.data.model.StudentRegisterData
 import com.canteen.student.data.model.StudentRegisterRequest
 import com.canteen.student.data.model.ToggleStockRequest
 import com.canteen.student.data.model.ToggleStockResponse
 import com.canteen.student.data.model.TopDishesData
+import com.canteen.student.data.model.UpdateCanteenInfoRequest
 import com.canteen.student.data.model.UpdateMenuItemRequest
 import com.canteen.student.data.model.UpdateOrderStatusRequest
 import retrofit2.Response
@@ -47,6 +56,15 @@ interface CanteenApiService {
     @POST("student/register")
     suspend fun registerStudent(@Body request: StudentRegisterRequest): Response<ApiResponse<StudentRegisterData>>
 
+    @POST("student/login")
+    suspend fun loginStudent(@Body request: StudentLoginRequest): Response<ApiResponse<StudentLoginData>>
+
+    @POST("owner/register")
+    suspend fun registerOwner(@Body request: OwnerRegisterRequest): Response<ApiResponse<OwnerRegisterData>>
+
+    @POST("owner/login")
+    suspend fun loginOwner(@Body request: OwnerLoginRequest): Response<ApiResponse<OwnerLoginData>>
+
 
     // --- STUDENT ENDPOINTS ---
 
@@ -62,8 +80,14 @@ interface CanteenApiService {
 
     // --- OWNER CANTEEN ENDPOINTS ---
 
+    @POST("owner/canteen")
+    suspend fun createCanteen(@Body request: CreateCanteenRequest): Response<ApiResponse<CreateCanteenData>>
+
     @GET("owner/canteen")
     suspend fun getCanteenInfo(): Response<ApiResponse<CanteenInfo>>
+
+    @PUT("owner/canteen")
+    suspend fun updateCanteenInfo(@Body request: UpdateCanteenInfoRequest): Response<ApiResponse<CanteenInfo>>
 
     @POST("owner/canteen/join-code")
     suspend fun regenerateJoinCode(): Response<ApiResponse<JoinCodeData>>

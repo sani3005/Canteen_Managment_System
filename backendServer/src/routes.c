@@ -28,6 +28,9 @@ static const Route routes[] = {
     /* public */
     { "GET",    "/api/health",                      handle_health,                    0 },
     { "POST",   "/api/student/register",            handle_student_register,           0 },
+    { "POST",   "/api/student/login",               handle_student_login,              0 },
+    { "POST",   "/api/owner/register",              handle_owner_register,             0 },
+    { "POST",   "/api/owner/login",                 handle_owner_login,                0 },
 
     /* Students */
     { "GET",    "/api/student/menu",                handle_get_student_menu,           2 },
@@ -36,6 +39,8 @@ static const Route routes[] = {
 
     /* Module 1: canteen */
     { "GET",    "/api/owner/canteen",               handle_get_canteen,               1 },
+    { "POST",   "/api/owner/canteen",               handle_post_canteen,              1 },
+    { "PUT",    "/api/owner/canteen",               handle_put_canteen,               1 },
     { "POST",   "/api/owner/canteen/join-code",     handle_post_join_code,            1 },
 
     /* Module 2: menu */
